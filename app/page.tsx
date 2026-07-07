@@ -134,10 +134,16 @@ export default function Page() {
             </a>
           </nav>
           <div className="flex items-center gap-3">
-            <Button variant="ghost" className="text-white hover:bg-white/10">
+            <Button
+              variant="ghost"
+              className="text-white hover:bg-white/10"
+              render={<a href="/login" />}
+            >
               Sign in
             </Button>
-            <Button className="hover:opacity-90">Request access</Button>
+            <Button className="hover:opacity-90" render={<a href="/login" />}>
+              Request access
+            </Button>
           </div>
         </div>
       </header>
@@ -177,13 +183,18 @@ export default function Page() {
               does, and nothing that happens to a document goes unrecorded.
             </p>
             <div className="mt-8 flex items-center gap-4">
-              <Button size="lg" className="hover:opacity-90">
+              <Button
+                size="lg"
+                className="hover:opacity-90"
+                render={<a href="/login" />}
+              >
                 Request access <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
               <Button
                 size="lg"
                 variant="outline"
                 className="border-white/25 bg-transparent text-white hover:bg-white/10"
+                render={<a href="#roles" />}
               >
                 See how permissions work
               </Button>
@@ -437,13 +448,18 @@ export default function Page() {
             your account is already active.
           </p>
           <div className="mt-8 flex items-center justify-center gap-4">
-            <Button size="lg" className="hover:opacity-90">
+            <Button
+              size="lg"
+              className="hover:opacity-90"
+              render={<a href="/login" />}
+            >
               Request access
             </Button>
             <Button
               size="lg"
               variant="outline"
               className="border-white/25 bg-transparent text-white hover:bg-white/10"
+              render={<a href="/login" />}
             >
               Sign in
             </Button>
