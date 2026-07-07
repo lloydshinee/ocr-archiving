@@ -46,12 +46,7 @@ export default function DashboardPage() {
               <Icon className="size-5 text-primary" />
             </div>
             <div className="min-w-0">
-              <p
-                className="truncate text-2xl font-semibold"
-                style={{ fontFamily: "var(--font-display)" }}
-              >
-                {value}
-              </p>
+              <p className="truncate text-2xl font-semibold">{value}</p>
               <p
                 className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground"
                 style={{ fontFamily: "var(--font-mono)" }}

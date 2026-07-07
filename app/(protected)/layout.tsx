@@ -36,11 +36,7 @@ export default async function ProtectedLayout({
           >
             CCS Archive
           </span>
-          <Separator
-            orientation="vertical"
-            className="h-4"
-            style={{ backgroundColor: "rgba(255,255,255,0.15)" }}
-          />
+          <Separator orientation="vertical" className="h-4 bg-white/10" />
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem>

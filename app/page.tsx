@@ -21,9 +21,9 @@ import {
   ShieldCheck,
 } from "lucide-react";
 
-const GREEN_950 = "oklch(0.18 0.03 160)";
-const GREEN_900 = "oklch(0.22 0.03 160)";
-const GREEN_600 = "oklch(0.55 0.15 155)";
+const INK = "var(--brand-ink, oklch(0.18 0.03 160))";
+const INK2 = "var(--brand-ink-2, oklch(0.22 0.03 160))";
+const ACCENT = "var(--brand-accent, oklch(0.55 0.15 155))";
 
 const ACTIONS = [
   { label: "View", icon: Eye, rotate: "-rotate-2" },
@@ -103,7 +103,7 @@ export default function Page() {
       <header
         className="sticky top-0 z-50 border-b"
         style={{
-          backgroundColor: GREEN_950,
+          backgroundColor: INK,
           borderColor: "rgba(255,255,255,0.08)",
         }}
       >
@@ -145,7 +145,7 @@ export default function Page() {
       {/* HERO */}
       <section
         className="relative overflow-hidden"
-        style={{ backgroundColor: GREEN_950 }}
+        style={{ backgroundColor: INK }}
       >
         <div className="mx-auto max-w-6xl px-6 pt-8">
           <div className="flex">
@@ -194,14 +194,14 @@ export default function Page() {
           <div
             className="rounded-lg border p-1 shadow-2xl"
             style={{
-              backgroundColor: GREEN_900,
+              backgroundColor: INK2,
               borderColor: "rgba(255,255,255,0.08)",
             }}
           >
             <div className="flex items-center gap-1.5 px-3 py-2">
               <span className="h-2.5 w-2.5 rounded-full bg-destructive" />
               <span className="h-2.5 w-2.5 rounded-full bg-primary" />
-              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: GREEN_600 }} />
+              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: ACCENT }} />
               <span
                 className="ml-3 text-xs text-white/50"
                 style={{ fontFamily: "var(--font-mono)" }}
@@ -264,7 +264,7 @@ export default function Page() {
         id="audit"
         className="overflow-hidden border-y py-3"
         style={{
-          backgroundColor: GREEN_900,
+          backgroundColor: INK2,
           borderColor: "rgba(255,255,255,0.08)",
         }}
       >
@@ -305,8 +305,8 @@ export default function Page() {
               <div
                 className="rounded-lg border p-6"
                 style={{
-                  backgroundColor: i < 2 ? GREEN_950 : undefined,
-                  borderColor: "oklch(0.9037 0 0)",
+                  backgroundColor: i < 2 ? INK : undefined,
+                  borderColor: "var(--border, oklch(0.9037 0 0))",
                   color: i < 2 ? undefined : undefined,
                 }}
               >
@@ -319,7 +319,7 @@ export default function Page() {
                 >
                   <span
                     style={{
-                      color: "oklch(0.55 0.15 155)",
+                      color: ACCENT,
                     }}
                   >
                     {i === 0 ? "Level 1" : i === 1 ? "Level 2" : "Level 3"}
@@ -337,7 +337,7 @@ export default function Page() {
                 <p
                   className="mt-2 text-sm leading-relaxed"
                   style={{
-                    color: i < 2 ? "rgba(255,255,255,0.7)" : "oklch(0.4386 0 0)",
+                    color: i < 2 ? "rgba(255,255,255,0.7)" : "var(--muted-foreground, oklch(0.4386 0 0))",
                   }}
                 >
                   {role.note}
@@ -424,7 +424,7 @@ export default function Page() {
       </section>
 
       {/* CTA */}
-      <section className="py-24" style={{ backgroundColor: GREEN_950 }}>
+      <section className="py-24" style={{ backgroundColor: INK }}>
         <div className="mx-auto max-w-6xl px-6 text-center">
           <h2
             className="text-3xl text-white md:text-5xl"
@@ -455,7 +455,7 @@ export default function Page() {
       <footer
         className="border-t py-10"
         style={{
-          backgroundColor: GREEN_950,
+          backgroundColor: INK,
           borderColor: "rgba(255,255,255,0.08)",
         }}
       >

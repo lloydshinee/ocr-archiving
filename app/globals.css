@@ -205,6 +205,12 @@
   animation: ccs-ticker-scroll 40s linear infinite;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .ccs-ticker {
+    animation: none;
+  }
+}
+
 @keyframes ccs-ticker-scroll {
   0% {
     transform: translateX(0);
