@@ -138,10 +138,11 @@ export default function Page() {
               variant="ghost"
               className="text-white hover:bg-white/10"
               render={<a href="/login" />}
+              nativeButton={false}
             >
               Sign in
             </Button>
-            <Button className="hover:opacity-90" render={<a href="/login" />}>
+            <Button className="hover:opacity-90" render={<a href="/login" />} nativeButton={false}>
               Request access
             </Button>
           </div>
@@ -187,6 +188,7 @@ export default function Page() {
                 size="lg"
                 className="hover:opacity-90"
                 render={<a href="/login" />}
+                nativeButton={false}
               >
                 Request access <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
@@ -195,6 +197,7 @@ export default function Page() {
                 variant="outline"
                 className="border-white/25 bg-transparent text-white hover:bg-white/10"
                 render={<a href="#roles" />}
+                nativeButton={false}
               >
                 See how permissions work
               </Button>
@@ -452,6 +455,7 @@ export default function Page() {
               size="lg"
               className="hover:opacity-90"
               render={<a href="/login" />}
+              nativeButton={false}
             >
               Request access
             </Button>
@@ -460,6 +464,7 @@ export default function Page() {
               variant="outline"
               className="border-white/25 bg-transparent text-white hover:bg-white/10"
               render={<a href="/login" />}
+              nativeButton={false}
             >
               Sign in
             </Button>
