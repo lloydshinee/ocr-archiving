@@ -1,23 +1,13 @@
-import { createClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
-
-const adminClient = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  },
-)
+import { createAdminClient } from "@/lib/admin-client"
+import { seedReferenceData } from "@/lib/seed"
 
 export async function HEAD() {
+  const adminClient = createAdminClient()
   const { count } = await adminClient
     .from("users")
     .select("*", { count: "exact", head: true })
 
-  // 204 = no users yet (first-run), 200 = already set up
   return new NextResponse(null, { status: count === 0 ? 204 : 200 })
 }
 
@@ -38,6 +28,8 @@ export async function POST(request: Request) {
         { status: 400 },
       )
     }
+
+    const adminClient = createAdminClient()
 
     const { count } = await adminClient
       .from("users")
@@ -67,7 +59,12 @@ export async function POST(request: Request) {
 
     const { error: insertError } = await adminClient
       .from("users")
-      .insert({ id: authUser.user.id, email, role: "dean", full_name: fullName })
+      .insert({
+        id: authUser.user.id,
+        email,
+        role: "dean",
+        full_name: fullName,
+      })
 
     if (insertError) {
       return NextResponse.json(
@@ -75,6 +72,8 @@ export async function POST(request: Request) {
         { status: 500 },
       )
     }
+
+    await seedReferenceData()
 
     return NextResponse.json({ success: true }, { status: 201 })
   } catch {

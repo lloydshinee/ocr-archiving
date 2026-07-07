@@ -408,6 +408,7 @@ export type Database = {
       users: {
         Row: {
           created_at: string
+          created_by: string | null
           deactivated_at: string | null
           email: string
           full_name: string
@@ -419,6 +420,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          created_by?: string | null
           deactivated_at?: string | null
           email: string
           full_name: string
@@ -430,6 +432,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          created_by?: string | null
           deactivated_at?: string | null
           email?: string
           full_name?: string

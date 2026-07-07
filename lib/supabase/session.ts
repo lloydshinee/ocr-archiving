@@ -5,7 +5,6 @@ import type { Database } from "@/lib/supabase/database.types"
 export async function updateSession(request: NextRequest) {
   const url = request.nextUrl.clone()
 
-  // /setup is always accessible — the API route guards against re-setup
   if (url.pathname === "/setup") {
     return NextResponse.next()
   }
@@ -38,15 +37,34 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   if (user) {
-    // Authenticated users on /login get redirected to /dashboard
     if (url.pathname === "/login") {
       url.pathname = "/dashboard"
       return NextResponse.redirect(url)
     }
+
+    if (url.pathname !== "/setup") {
+      const { data: profile } = await supabase
+        .from("users")
+        .select("is_deactivated")
+        .eq("id", user.id)
+        .single()
+
+      if (profile?.is_deactivated) {
+        const loginUrl = new URL("/login", request.url)
+        loginUrl.searchParams.set("reason", "deactivated")
+        const response = NextResponse.redirect(loginUrl)
+        for (const cookie of request.cookies.getAll()) {
+          if (cookie.name.startsWith("sb-")) {
+            response.cookies.set(cookie.name, "", { maxAge: 0, path: "/" })
+          }
+        }
+        return response
+      }
+    }
+
     return supabaseResponse
   }
 
-  // Unauthenticated users on protected routes -> /login
   if (url.pathname.startsWith("/dashboard")) {
     url.pathname = "/login"
     return NextResponse.redirect(url)
