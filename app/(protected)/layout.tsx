@@ -1,7 +1,7 @@
-import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage } from "@/components/ui/breadcrumb"
 import { Separator } from "@/components/ui/separator"
 import { createClient } from "@/lib/supabase/server"
 import { SignoutButton } from "@/components/signout-button"
+import Link from "next/link"
 
 export default async function ProtectedLayout({
   children,
@@ -17,14 +17,17 @@ export default async function ProtectedLayout({
     ? await supabase.from("users").select("*").eq("id", user.id).single()
     : { data: null }
 
+  const showUsersLink =
+    profile &&
+    (profile.role === "dean" || profile.role === "program_head")
+
   return (
     <div className="flex min-h-svh flex-col bg-background">
       {/* Top nav — brand-ink, matching landing page */}
       <header
-        className="sticky top-0 z-50 flex h-14 shrink-0 items-center justify-between border-b px-6"
+        className="sticky top-0 z-50 flex h-14 shrink-0 items-center justify-between border-b border-white/10 px-6"
         style={{
           backgroundColor: "var(--brand-ink, oklch(0.18 0.03 160))",
-          borderColor: "rgba(255,255,255,0.08)",
         }}
       >
         <div className="flex items-center gap-3">
@@ -37,18 +40,24 @@ export default async function ProtectedLayout({
             CCS Archive
           </span>
           <Separator orientation="vertical" className="h-4 bg-white/10" />
-          <Breadcrumb>
-            <BreadcrumbList>
-              <BreadcrumbItem>
-                <BreadcrumbPage
-                  className="text-xs uppercase tracking-[0.15em] text-white/50"
-                  style={{ fontFamily: "var(--font-mono)" }}
-                >
-                  Dashboard
-                </BreadcrumbPage>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
+          <nav className="flex items-center gap-1">
+            <Link
+              href="/dashboard"
+              className="rounded-md px-2 py-1 text-xs uppercase tracking-[0.15em] text-white/50 transition-colors hover:bg-white/10 hover:text-white/80"
+              style={{ fontFamily: "var(--font-mono)" }}
+            >
+              Dashboard
+            </Link>
+            {showUsersLink && (
+              <Link
+                href="/dashboard/users"
+                className="rounded-md px-2 py-1 text-xs uppercase tracking-[0.15em] text-white/50 transition-colors hover:bg-white/10 hover:text-white/80"
+                style={{ fontFamily: "var(--font-mono)" }}
+              >
+                Users
+              </Link>
+            )}
+          </nav>
         </div>
 
         <div className="flex items-center gap-4">
