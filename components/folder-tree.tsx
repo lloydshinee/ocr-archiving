@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { FolderIcon, FileTextIcon, ChevronRightIcon } from "lucide-react"
+import { FolderIcon, FileTextIcon, ChevronRightIcon, ArchiveIcon } from "lucide-react"
 import { useRouter, usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import {
@@ -36,6 +36,7 @@ function FolderTreeItem({
   const isSub = depth > 0
 
   const Wrapper = isSub ? SidebarMenuSubItem : SidebarMenuItem
+  const isArchived = folder.is_archived
 
   if (!hasChildren) {
     return (
@@ -44,19 +45,37 @@ function FolderTreeItem({
           <SidebarMenuSubButton
             isActive={isActive}
             onClick={() => router.push(href)}
+            className={cn(isArchived && "opacity-50")}
           >
-            <span className="truncate">{folder.name}</span>
+            <span className={cn("truncate", isArchived && "italic")}>{folder.name}</span>
+            {isArchived && (
+              <span
+                className="ml-1 shrink-0 text-[9px] text-muted-foreground/50"
+                style={{ fontFamily: "var(--font-mono)" }}
+              >
+                ARCHIVED
+              </span>
+            )}
           </SidebarMenuSubButton>
         ) : (
           <SidebarMenuButton
             isActive={isActive}
-            tooltip={folder.name}
+            tooltip={folder.name + (isArchived ? " (archived)" : "")}
             onClick={() => router.push(href)}
+            className={cn(isArchived && "opacity-60")}
           >
             <FolderIcon className="size-4 shrink-0" />
-            <span className="truncate group-data-[collapsible=icon]:hidden">
+            <span className={cn("truncate group-data-[collapsible=icon]:hidden", isArchived && "italic")}>
               {folder.name}
             </span>
+            {isArchived && (
+              <span
+                className="ml-1 shrink-0 text-[9px] text-muted-foreground/50 group-data-[collapsible=icon]:hidden"
+                style={{ fontFamily: "var(--font-mono)" }}
+              >
+                ARCHIVED
+              </span>
+            )}
           </SidebarMenuButton>
         )}
       </Wrapper>
@@ -71,9 +90,17 @@ function FolderTreeItem({
             <SidebarMenuSubButton
               isActive={isActive}
               onClick={() => router.push(href)}
-              className="flex-1"
+              className={cn("flex-1", isArchived && "opacity-50")}
             >
-              <span className="truncate">{folder.name}</span>
+              <span className={cn("truncate", isArchived && "italic")}>{folder.name}</span>
+              {isArchived && (
+                <span
+                  className="ml-1 shrink-0 text-[9px] text-muted-foreground/50"
+                  style={{ fontFamily: "var(--font-mono)" }}
+                >
+                  ARCHIVED
+                </span>
+              )}
             </SidebarMenuSubButton>
             <CollapsibleTrigger
               render={
@@ -92,13 +119,22 @@ function FolderTreeItem({
           <>
             <SidebarMenuButton
               isActive={isActive}
-              tooltip={folder.name}
+              tooltip={folder.name + (isArchived ? " (archived)" : "")}
               onClick={() => router.push(href)}
+              className={cn(isArchived && "opacity-60")}
             >
               <FolderIcon className="size-4 shrink-0" />
-              <span className="truncate group-data-[collapsible=icon]:hidden">
+              <span className={cn("truncate group-data-[collapsible=icon]:hidden", isArchived && "italic")}>
                 {folder.name}
               </span>
+              {isArchived && (
+                <span
+                  className="ml-1 shrink-0 text-[9px] text-muted-foreground/50 group-data-[collapsible=icon]:hidden"
+                  style={{ fontFamily: "var(--font-mono)" }}
+                >
+                  ARCHIVED
+                </span>
+              )}
             </SidebarMenuButton>
             <CollapsibleTrigger
               render={

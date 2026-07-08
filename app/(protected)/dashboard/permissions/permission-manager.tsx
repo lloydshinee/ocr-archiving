@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useMemo } from "react"
 import { toast } from "sonner"
 import { Trash2Icon, FolderPlusIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -20,6 +20,11 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
+import { FolderCombobox } from "@/components/folder-combobox"
+import { getFolderParentPath } from "@/lib/folder-utils"
+import type { Database } from "@/lib/supabase/database.types"
+
+type FolderRow = Database["public"]["Tables"]["folders"]["Row"]
 
 const ALL_ACTIONS = ["view", "create", "edit", "move", "delete", "archive"] as const
 type PermAction = (typeof ALL_ACTIONS)[number]
@@ -33,6 +38,7 @@ interface UserOption {
 interface FolderOption {
   id: string
   name: string
+  parentPath: string
 }
 
 interface PermissionEntry {
@@ -47,7 +53,7 @@ interface PermissionEntry {
 
 export function PermissionManager() {
   const [users, setUsers] = useState<UserOption[]>([])
-  const [folders, setFolders] = useState<FolderOption[]>([])
+  const [folders, setFolders] = useState<FolderRow[]>([])
   const [selectedUser, setSelectedUser] = useState<string>("")
   const [selectedFolder, setSelectedFolder] = useState<string>("")
   const [selectedActions, setSelectedActions] = useState<Set<PermAction>>(new Set())
@@ -56,6 +62,16 @@ export function PermissionManager() {
   const [error, setError] = useState<string | null>(null)
   const [folderPermissions, setFolderPermissions] = useState<PermissionEntry[]>([])
   const [permsLoading, setPermsLoading] = useState(false)
+
+  const folderOptions: FolderOption[] = useMemo(
+    () =>
+      folders.map((f) => ({
+        id: f.id,
+        name: f.name,
+        parentPath: getFolderParentPath(f.id, folders),
+      })),
+    [folders],
+  )
 
   useEffect(() => {
     async function load() {
@@ -269,20 +285,11 @@ export function PermissionManager() {
                 >
                   Folder
                 </Label>
-                <Select value={selectedFolder} onValueChange={(v) => setSelectedFolder(v ?? "")}>
-                  <SelectTrigger>
-                    {selectedFolder
-                      ? folders.find((f) => f.id === selectedFolder)?.name ?? "Select a folder..."
-                      : "Select a folder..."}
-                  </SelectTrigger>
-                  <SelectContent>
-                    {folders.map((f) => (
-                      <SelectItem key={f.id} value={f.id}>
-                        {f.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <FolderCombobox
+                  folders={folderOptions}
+                  value={selectedFolder}
+                  onChange={(v) => setSelectedFolder(v)}
+                />
               </div>
 
               <div className="flex flex-col gap-2">

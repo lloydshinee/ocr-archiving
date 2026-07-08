@@ -26,6 +26,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
+import { Switch } from "@/components/ui/switch"
 import { FolderTree } from "@/components/folder-tree"
 import { buildFolderTree, type FolderTreeNode } from "@/lib/folder-utils"
 import type { Database } from "@/lib/supabase/database.types"
@@ -45,6 +46,7 @@ export function AppSidebar() {
   const [newFolderName, setNewFolderName] = useState("")
   const [newFolderError, setNewFolderError] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [showArchived, setShowArchived] = useState(false)
 
   const fetchFolders = useCallback(async () => {
     try {
@@ -52,7 +54,7 @@ export function AppSidebar() {
       setError(null)
 
       const [foldersRes, programsRes] = await Promise.all([
-        fetch("/api/folders"),
+        fetch(`/api/folders${showArchived ? "?showArchived=true" : ""}`),
         fetch("/api/folders/programs"),
       ])
 
@@ -69,7 +71,7 @@ export function AppSidebar() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [showArchived])
 
   useEffect(() => {
     fetchFolders()
@@ -184,6 +186,21 @@ export function AppSidebar() {
         </SidebarHeader>
 
         <SidebarContent>
+          <div className="flex items-center justify-between px-3 py-2 group-data-[collapsible=icon]:hidden">
+            <Label
+              htmlFor="show-archived-toggle"
+              className="cursor-pointer text-[10px] uppercase tracking-[0.12em] text-sidebar-foreground/50"
+              style={{ fontFamily: "var(--font-mono)" }}
+            >
+              Show archived
+            </Label>
+            <Switch
+              id="show-archived-toggle"
+              checked={showArchived}
+              onCheckedChange={setShowArchived}
+            />
+          </div>
+
           {loading ? (
             <div className="flex flex-col gap-2 px-3">
               {Array.from({ length: 5 }).map((_, i) => (

@@ -47,3 +47,12 @@ export function getFolderBreadcrumbs(
 
   return breadcrumbs
 }
+
+export function getFolderParentPath(
+  folderId: string,
+  flatFolders: FolderRow[],
+): string {
+  const breadcrumbs = getFolderBreadcrumbs(folderId, flatFolders)
+  breadcrumbs.pop()
+  return breadcrumbs.map((b) => b.name).join(" > ")
+}
