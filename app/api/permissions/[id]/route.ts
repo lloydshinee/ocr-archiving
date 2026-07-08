@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/admin-client"
-import { canManagePermissions, ALL_ACTIONS, type PermAction } from "@/lib/permission-utils"
+import { canManagePermissions, getUserProfile, ALL_ACTIONS, type PermAction } from "@/lib/permission-utils"
 
 export async function PATCH(
   request: Request,
@@ -34,10 +34,13 @@ export async function PATCH(
         .single()
 
       if (folder && folder.owner_id === perm.user_id) {
-        return NextResponse.json(
-          { error: "Cannot modify the folder owner's baseline permissions" },
-          { status: 403 },
-        )
+        const profile = await getUserProfile(user.id)
+        if (profile?.role !== "dean" && profile?.role !== "program_head") {
+          return NextResponse.json(
+            { error: "Cannot modify the folder owner's baseline permissions" },
+            { status: 403 },
+          )
+        }
       }
     }
 
@@ -108,10 +111,13 @@ export async function DELETE(
         .single()
 
       if (folder && folder.owner_id === perm.user_id) {
-        return NextResponse.json(
-          { error: "Cannot revoke the folder owner's baseline permissions" },
-          { status: 403 },
-        )
+        const profile = await getUserProfile(user.id)
+        if (profile?.role !== "dean" && profile?.role !== "program_head") {
+          return NextResponse.json(
+            { error: "Cannot revoke the folder owner's baseline permissions" },
+            { status: 403 },
+          )
+        }
       }
     }
 
