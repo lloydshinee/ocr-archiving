@@ -5,15 +5,19 @@ import type { Database } from "@/lib/supabase/database.types"
 
 type FolderRow = Database["public"]["Tables"]["folders"]["Row"]
 
-async function getProgramHeadFolders(programId: string): Promise<FolderRow[]> {
+async function getProgramHeadFolders(programId: string, showArchived: boolean): Promise<FolderRow[]> {
   const adminClient = createAdminClient()
   const { data, error } = await adminClient
     .rpc("get_program_folder_subtree", { p_program_id: programId })
   if (error) throw error
-  return (data as FolderRow[]) ?? []
+  let results = (data as FolderRow[]) ?? []
+  if (!showArchived) {
+    results = results.filter((f) => !f.is_archived)
+  }
+  return results
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -27,18 +31,26 @@ export async function GET() {
 
     if (!profile) return NextResponse.json({ error: "User profile not found" }, { status: 404 })
 
+    const url = new URL(request.url)
+    const showArchived = url.searchParams.get("showArchived") === "true"
+
     const adminClient = createAdminClient()
     let folders: FolderRow[] = []
 
     if (profile.role === "dean") {
-      const { data } = await adminClient
+      let query = adminClient
         .from("folders")
         .select("*")
         .is("deleted_at", null)
-        .order("name")
+
+      if (!showArchived) {
+        query = query.eq("is_archived", false)
+      }
+
+      const { data } = await query.order("name")
       folders = data ?? []
     } else if (profile.role === "program_head" && profile.program_id) {
-      folders = await getProgramHeadFolders(profile.program_id)
+      folders = await getProgramHeadFolders(profile.program_id, showArchived)
     } else {
       const { data: userPerms } = await adminClient
         .from("permissions")
@@ -46,12 +58,17 @@ export async function GET() {
         .eq("user_id", user.id)
         .not("folder_id", "is", null)
 
-      const { data: ownedFolders } = await adminClient
+      let query = adminClient
         .from("folders")
         .select("*")
         .eq("owner_id", user.id)
         .is("deleted_at", null)
-        .order("name")
+
+      if (!showArchived) {
+        query = query.eq("is_archived", false)
+      }
+
+      const { data: ownedFolders } = await query.order("name")
 
       const permittedIds = new Set(userPerms?.map((p) => p.folder_id!) ?? [])
 
@@ -63,12 +80,17 @@ export async function GET() {
       }
 
       if (permittedIds.size > 0) {
-        const { data: permFolders } = await adminClient
+        let permQuery = adminClient
           .from("folders")
           .select("*")
           .in("id", Array.from(permittedIds))
           .is("deleted_at", null)
-          .order("name")
+
+        if (!showArchived) {
+          permQuery = permQuery.eq("is_archived", false)
+        }
+
+        const { data: permFolders } = await permQuery.order("name")
 
         if (permFolders) {
           for (const f of permFolders) {

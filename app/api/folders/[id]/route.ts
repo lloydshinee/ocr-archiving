@@ -204,7 +204,58 @@ export async function DELETE(
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
+    const profile = await getUserProfile(user.id)
+    if (!profile) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
     const { id } = await params
+    const url = new URL(request.url)
+    const isPermanent = url.searchParams.get("permanent") === "true"
+
+    if (isPermanent && profile.role !== "dean") {
+      return NextResponse.json({ error: "Only the Dean can permanently delete items" }, { status: 403 })
+    }
+
+    const adminClient = createAdminClient()
+
+    if (isPermanent) {
+      const allIds = await collectAllDescendantIds(adminClient, id)
+
+      for (const fid of allIds) {
+        const { data: docs } = await adminClient
+          .from("documents")
+          .select("id")
+          .eq("folder_id", fid)
+
+        if (docs) {
+          for (const doc of docs) {
+            const { data: versions } = await adminClient
+              .from("document_versions")
+              .select("id")
+              .eq("document_id", doc.id)
+
+            await adminClient.from("document_tags").delete().eq("document_id", doc.id)
+            await adminClient.from("document_versions").delete().eq("document_id", doc.id)
+            await adminClient.from("comments").delete().eq("document_id", doc.id)
+            await adminClient.from("permissions").delete().eq("document_id", doc.id)
+            await adminClient.from("notifications").delete().eq("resource_type", "document").eq("resource_id", doc.id)
+            await adminClient.from("documents").delete().eq("id", doc.id)
+          }
+        }
+
+        await adminClient.from("permissions").delete().eq("folder_id", fid)
+        await adminClient.from("notifications").delete().eq("resource_type", "folder").eq("resource_id", fid)
+        await adminClient.from("folders").delete().eq("id", fid)
+
+        await adminClient.from("audit_logs").insert({
+          user_id: user.id,
+          action: "permanent_delete",
+          resource_type: "folder",
+          resource_id: fid,
+        })
+      }
+
+      return NextResponse.json({ success: true })
+    }
 
     const canDel = await hasFolderAction(user.id, id, "delete")
     if (!canDel) return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
@@ -214,25 +265,73 @@ export async function DELETE(
       return NextResponse.json({ error: "This folder is locked" }, { status: 403 })
     }
 
-    const adminClient = createAdminClient()
-    const { error } = await adminClient
-      .from("folders")
-      .update({ deleted_at: new Date().toISOString(), deleted_by: user.id })
-      .eq("id", id)
+    const now = new Date().toISOString()
+    const allIds = await collectAllDescendantIds(adminClient, id)
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    for (const fid of allIds) {
+      await adminClient
+        .from("folders")
+        .update({ deleted_at: now, deleted_by: user.id })
+        .eq("id", fid)
+        .is("deleted_at", null)
 
-    await adminClient.from("audit_logs").insert({
-      user_id: user.id,
-      action: "delete_folder",
-      resource_type: "folder",
-      resource_id: id,
-    })
+      await adminClient.from("audit_logs").insert({
+        user_id: user.id,
+        action: "delete_folder",
+        resource_type: "folder",
+        resource_id: fid,
+        details: { parent_id: fid === id ? null : id },
+      })
+    }
+
+    for (const fid of allIds) {
+      await adminClient
+        .from("documents")
+        .update({ deleted_at: now, deleted_by: user.id })
+        .eq("folder_id", fid)
+        .is("deleted_at", null)
+
+      const { data: folderDocs } = await adminClient
+        .from("documents")
+        .select("id")
+        .eq("folder_id", fid)
+
+      if (folderDocs) {
+        for (const doc of folderDocs) {
+          await adminClient.from("audit_logs").insert({
+            user_id: user.id,
+            action: "delete_document",
+            resource_type: "document",
+            resource_id: doc.id,
+          })
+        }
+      }
+    }
 
     return NextResponse.json({ success: true })
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
+}
+
+async function collectAllDescendantIds(
+  adminClient: ReturnType<typeof createAdminClient>,
+  folderId: string,
+): Promise<string[]> {
+  const result: string[] = [folderId]
+  const { data: children } = await adminClient
+    .from("folders")
+    .select("id")
+    .eq("parent_id", folderId)
+
+  if (children) {
+    for (const child of children) {
+      const descendants = await collectAllDescendantIds(adminClient, child.id)
+      result.push(...descendants)
+    }
+  }
+
+  return result
 }
 
 async function getFolderBreadcrumbsFromDb(
