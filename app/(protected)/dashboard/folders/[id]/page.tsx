@@ -6,6 +6,7 @@ import { FolderIcon, FileIcon, FileTextIcon } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { notFound } from "next/navigation"
 import { CreateSubfolderDialog } from "./create-subfolder-dialog"
+import { FolderActions } from "./folder-actions"
 
 export default async function FolderPage({
   params,
@@ -134,6 +135,16 @@ export default async function FolderPage({
                 year: "numeric",
               })}
             </span>
+          </div>
+          <div className="mt-3">
+            <FolderActions
+              folderId={folder.id}
+              folderName={folder.name}
+              isLocked={folder.is_locked ?? false}
+              inheritPermissions={folder.inherit_permissions ?? true}
+              ownerName={ownerProfile?.full_name ?? "Unknown"}
+              userRole={profile?.role ?? ""}
+            />
           </div>
         </div>
 
