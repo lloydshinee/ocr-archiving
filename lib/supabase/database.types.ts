@@ -178,6 +178,7 @@ export type Database = {
           category_id: string | null
           created_at: string
           current_version_id: string | null
+          db_previously_archived: boolean | null
           deleted_at: string | null
           deleted_by: string | null
           description: string | null
@@ -198,6 +199,7 @@ export type Database = {
           category_id?: string | null
           created_at?: string
           current_version_id?: string | null
+          db_previously_archived?: boolean | null
           deleted_at?: string | null
           deleted_by?: string | null
           description?: string | null
@@ -218,6 +220,7 @@ export type Database = {
           category_id?: string | null
           created_at?: string
           current_version_id?: string | null
+          db_previously_archived?: boolean | null
           deleted_at?: string | null
           deleted_by?: string | null
           description?: string | null
@@ -241,6 +244,7 @@ export type Database = {
           category_id: string | null
           created_at: string
           created_by: string | null
+          db_previously_archived: boolean | null
           deleted_at: string | null
           deleted_by: string | null
           id: string
@@ -262,6 +266,7 @@ export type Database = {
           category_id?: string | null
           created_at?: string
           created_by?: string | null
+          db_previously_archived?: boolean | null
           deleted_at?: string | null
           deleted_by?: string | null
           id?: string
@@ -283,6 +288,7 @@ export type Database = {
           category_id?: string | null
           created_at?: string
           created_by?: string | null
+          db_previously_archived?: boolean | null
           deleted_at?: string | null
           deleted_by?: string | null
           id?: string
