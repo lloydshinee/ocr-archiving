@@ -212,11 +212,12 @@ export async function getFolderEffectivePermissions(
   if (!data) return []
 
   return data.map((p) => ({
-    userId: p.user_id,
+    id: (p as any).id,
+    userId: (p as any).user_id,
     userFullName: (p as any).users?.full_name ?? "Unknown",
-    actions: p.actions,
-    assignedBy: p.assigned_by,
+    actions: (p as any).actions,
+    assignedBy: (p as any).assigned_by,
     assignedByName: (p as any).assigned_by_user?.full_name ?? "Unknown",
-    assignedDate: p.created_at,
+    assignedDate: (p as any).created_at,
   }))
 }
