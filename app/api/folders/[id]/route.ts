@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/admin-client"
-import { getFolderBreadcrumbs } from "@/lib/folder-utils"
 
 export async function GET(
   _request: Request,

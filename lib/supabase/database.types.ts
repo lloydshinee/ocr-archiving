@@ -452,7 +452,12 @@ export type Database = {
       }
     }
     Views: Record<string, never>
-    Functions: Record<string, never>
+    Functions: {
+      get_program_folder_subtree: {
+        Args: { p_program_id: string }
+        Returns: Database["public"]["Tables"]["folders"]["Row"][]
+      }
+    }
     Enums: {
       user_role: "dean" | "program_head" | "faculty" | "student_assistant"
     }

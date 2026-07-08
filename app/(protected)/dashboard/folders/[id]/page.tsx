@@ -44,6 +44,7 @@ export default async function FolderPage({
     profile?.role === "dean" ||
     (profile?.role === "program_head" &&
       profile.program_id === folder.program_id)
+  // TODO(#5): replace role-based gate with permissions table query for Create permission
 
   const { data: subfolders } = await adminClient
     .from("folders")
@@ -139,7 +140,7 @@ export default async function FolderPage({
               className="text-[11px] text-muted-foreground/50"
               style={{ fontFamily: "var(--font-mono)" }}
             >
-              Documents will appear here once uploaded
+              Upload a document to get started
             </p>
           </div>
         )}

@@ -39,10 +39,7 @@ export default async function ProtectedLayout({
         >
           <div className="flex items-center gap-3">
             <SidebarTrigger className="text-white/70 hover:text-white hover:bg-white/10 -ml-2" />
-            <span
-              className="text-sm tracking-tight text-white"
-              style={{ fontFamily: "var(--font-display)" }}
-            >
+            <span className="text-sm tracking-tight text-white">
               CCS Archive
             </span>
             <Separator

@@ -8,32 +8,12 @@ type FolderRow = Database["public"]["Tables"]["folders"]["Row"]
 async function getProgramHeadFolders(programId: string): Promise<FolderRow[]> {
   const adminClient = createAdminClient()
 
-  const { data: roots } = await adminClient
-    .from("folders")
-    .select("*")
-    .eq("program_id", programId)
-    .is("parent_id", null)
-    .is("deleted_at", null)
+  const { data, error } = await adminClient
+    .rpc("get_program_folder_subtree", { p_program_id: programId })
 
-  if (!roots || roots.length === 0) return []
+  if (error) throw error
 
-  const allFolders: FolderRow[] = [...roots]
-  let currentIds = roots.map((f) => f.id)
-
-  while (currentIds.length > 0) {
-    const { data: children } = await adminClient
-      .from("folders")
-      .select("*")
-      .in("parent_id", currentIds)
-      .is("deleted_at", null)
-
-    if (!children || children.length === 0) break
-
-    allFolders.push(...children)
-    currentIds = children.map((c) => c.id)
-  }
-
-  return allFolders
+  return (data as FolderRow[]) ?? []
 }
 
 export async function GET() {
