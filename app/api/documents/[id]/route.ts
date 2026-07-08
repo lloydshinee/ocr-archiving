@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/admin-client"
+import {
+  hasDocumentAction,
+  getUserProfile,
+  isFolderLocked,
+  canBypassLock,
+} from "@/lib/permission-utils"
 
 export async function GET(
   _request: Request,
@@ -8,15 +14,14 @@ export async function GET(
 ) {
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const { id } = await params
+
+    const canView = await hasDocumentAction(user.id, id, "view")
+    if (!canView) return NextResponse.json({ error: "Access denied" }, { status: 403 })
+
     const adminClient = createAdminClient()
 
     const { data: doc } = await adminClient
@@ -89,39 +94,35 @@ export async function PATCH(
 ) {
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    const { data: profile } = await supabase
-      .from("users")
-      .select("role")
-      .eq("id", user.id)
-      .single()
-
-    if (!profile) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    const profile = await getUserProfile(user.id)
+    if (!profile) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const { id } = await params
-    const { title, description, folderId, categoryId, documentTypeId, tags: tagsStr } =
-      await request.json()
+    const body = await request.json()
+    const { title, description, folderId, categoryId, documentTypeId, tags: tagsStr } = body
 
     const adminClient = createAdminClient()
 
     const { data: existing } = await adminClient
       .from("documents")
-      .select("id, owner_id")
+      .select("id, owner_id, folder_id")
       .eq("id", id)
       .is("deleted_at", null)
       .single()
 
-    if (!existing) {
-      return NextResponse.json({ error: "Document not found" }, { status: 404 })
+    if (!existing) return NextResponse.json({ error: "Document not found" }, { status: 404 })
+
+    const canEdit = await hasDocumentAction(user.id, id, "edit")
+    if (!canEdit) return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
+
+    if (existing.folder_id) {
+      const locked = await isFolderLocked(existing.folder_id)
+      if (locked && !(await canBypassLock(user.id))) {
+        return NextResponse.json({ error: "The folder containing this document is locked" }, { status: 403 })
+      }
     }
 
     const isDean = profile.role === "dean"

@@ -55,13 +55,22 @@ export default async function ProtectedLayout({
                 Dashboard
               </Link>
               {showUsersLink && (
-                <Link
-                  href="/dashboard/users"
-                  className="rounded-md px-2 py-1 text-xs uppercase tracking-[0.15em] text-white/50 transition-colors hover:bg-white/10 hover:text-white/80"
-                  style={{ fontFamily: "var(--font-mono)" }}
-                >
-                  Users
-                </Link>
+                <>
+                  <Link
+                    href="/dashboard/users"
+                    className="rounded-md px-2 py-1 text-xs uppercase tracking-[0.15em] text-white/50 transition-colors hover:bg-white/10 hover:text-white/80"
+                    style={{ fontFamily: "var(--font-mono)" }}
+                  >
+                    Users
+                  </Link>
+                  <Link
+                    href="/dashboard/permissions"
+                    className="rounded-md px-2 py-1 text-xs uppercase tracking-[0.15em] text-white/50 transition-colors hover:bg-white/10 hover:text-white/80"
+                    style={{ fontFamily: "var(--font-mono)" }}
+                  >
+                    Permissions
+                  </Link>
+                </>
               )}
             </nav>
           </div>

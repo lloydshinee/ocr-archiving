@@ -7,25 +7,17 @@ type FolderRow = Database["public"]["Tables"]["folders"]["Row"]
 
 async function getProgramHeadFolders(programId: string): Promise<FolderRow[]> {
   const adminClient = createAdminClient()
-
   const { data, error } = await adminClient
     .rpc("get_program_folder_subtree", { p_program_id: programId })
-
   if (error) throw error
-
   return (data as FolderRow[]) ?? []
 }
 
 export async function GET() {
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const { data: profile } = await supabase
       .from("users")
@@ -33,16 +25,9 @@ export async function GET() {
       .eq("id", user.id)
       .single()
 
-    if (!profile) {
-      return NextResponse.json({ error: "User profile not found" }, { status: 404 })
-    }
-
-    if (profile.role === "faculty" || profile.role === "student_assistant") {
-      return NextResponse.json({ folders: [] })
-    }
+    if (!profile) return NextResponse.json({ error: "User profile not found" }, { status: 404 })
 
     const adminClient = createAdminClient()
-
     let folders: FolderRow[] = []
 
     if (profile.role === "dean") {
@@ -51,18 +36,53 @@ export async function GET() {
         .select("*")
         .is("deleted_at", null)
         .order("name")
-
       folders = data ?? []
     } else if (profile.role === "program_head" && profile.program_id) {
       folders = await getProgramHeadFolders(profile.program_id)
+    } else {
+      const { data: userPerms } = await adminClient
+        .from("permissions")
+        .select("folder_id")
+        .eq("user_id", user.id)
+        .not("folder_id", "is", null)
+
+      const { data: ownedFolders } = await adminClient
+        .from("folders")
+        .select("*")
+        .eq("owner_id", user.id)
+        .is("deleted_at", null)
+        .order("name")
+
+      const permittedIds = new Set(userPerms?.map((p) => p.folder_id!) ?? [])
+
+      if (ownedFolders) {
+        for (const f of ownedFolders) {
+          permittedIds.add(f.id)
+          folders.push(f)
+        }
+      }
+
+      if (permittedIds.size > 0) {
+        const { data: permFolders } = await adminClient
+          .from("folders")
+          .select("*")
+          .in("id", Array.from(permittedIds))
+          .is("deleted_at", null)
+          .order("name")
+
+        if (permFolders) {
+          for (const f of permFolders) {
+            if (!folders.some((existing) => existing.id === f.id)) {
+              folders.push(f)
+            }
+          }
+        }
+      }
     }
 
     return NextResponse.json({ folders })
   } catch {
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    )
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
 
@@ -94,6 +114,22 @@ export async function POST(request: Request) {
     }
 
     const adminClient = createAdminClient()
+    const { isFolderLocked, hasFolderAction } = await import("@/lib/permission-utils")
+
+    if (parentId) {
+      const locked = await isFolderLocked(parentId)
+      if (locked) {
+        const { canBypassLock } = await import("@/lib/permission-utils")
+        if (!(await canBypassLock(user.id))) {
+          return NextResponse.json({ error: "Parent folder is locked" }, { status: 403 })
+        }
+      }
+
+      const canCreate = await hasFolderAction(user.id, parentId, "create")
+      if (!canCreate) {
+        return NextResponse.json({ error: "You do not have permission to create subfolders here" }, { status: 403 })
+      }
+    }
 
     if (profile.role === "dean") {
       const { data: folder, error } = await adminClient
