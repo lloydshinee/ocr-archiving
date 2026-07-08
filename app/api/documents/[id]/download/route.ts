@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/admin-client"
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
@@ -19,6 +19,9 @@ export async function GET(
     const { id } = await params
     const adminClient = createAdminClient()
 
+    const { searchParams } = new URL(request.url)
+    const versionId = searchParams.get("version")
+
     const { data: doc } = await adminClient
       .from("documents")
       .select("id, file_name, current_version_id")
@@ -30,10 +33,19 @@ export async function GET(
       return NextResponse.json({ error: "Document not found" }, { status: 404 })
     }
 
+    const lookupVersionId = versionId ?? doc.current_version_id
+
+    if (!lookupVersionId) {
+      return NextResponse.json(
+        { error: "No version specified" },
+        { status: 400 },
+      )
+    }
+
     const { data: version } = await adminClient
       .from("document_versions")
       .select("file_path, file_type, file_size")
-      .eq("id", doc.current_version_id!)
+      .eq("id", lookupVersionId)
       .single()
 
     if (!version) {

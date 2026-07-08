@@ -118,6 +118,16 @@ export default async function DocumentPage({
               day: "numeric",
             })}
           </span>
+          <span>
+            Modified{" "}
+            <span style={{ fontFamily: "var(--font-mono)" }}>
+              {new Date(doc.updated_at).toLocaleDateString("en-US", {
+                year: "numeric",
+                month: "short",
+                day: "numeric",
+              })}
+            </span>
+          </span>
           <span style={{ fontFamily: "var(--font-mono)" }}>
             {versions?.length ?? 0} version{(versions?.length ?? 0) !== 1 ? "s" : ""}
           </span>
