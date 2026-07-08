@@ -201,15 +201,75 @@ export function AppSidebar() {
               </button>
             </div>
           ) : folders.length === 0 ? (
-            <div className="flex flex-col items-center gap-3 px-3 py-8">
-              <FileTextIcon className="size-6 text-sidebar-foreground/30" />
-              <p
-                className="text-[11px] uppercase tracking-[0.12em] text-sidebar-foreground/40 text-center group-data-[collapsible=icon]:hidden"
-                style={{ fontFamily: "var(--font-mono)" }}
-              >
-                No folders to show
-              </p>
-            </div>
+            <SidebarGroup>
+              <SidebarGroupLabel>College-Wide</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <div className="flex flex-col items-center gap-3 px-3 py-8">
+                  <FileTextIcon className="size-6 text-sidebar-foreground/30" />
+                  <p
+                    className="text-[11px] uppercase tracking-[0.12em] text-sidebar-foreground/40 text-center group-data-[collapsible=icon]:hidden"
+                    style={{ fontFamily: "var(--font-mono)" }}
+                  >
+                    No folders to show
+                  </p>
+                  <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                    <DialogTrigger
+                      render={
+                        <button className="rounded-md border border-sidebar-border px-3 py-1 text-xs text-sidebar-foreground/70 hover:bg-sidebar-accent transition-colors">
+                          New folder
+                        </button>
+                      }
+                    />
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>New college-wide folder</DialogTitle>
+                      </DialogHeader>
+                      <form onSubmit={handleCreateFolder}>
+                        <fieldset disabled={creatingFolder} className="flex flex-col gap-4">
+                          <div className="flex flex-col gap-2">
+                            <Label
+                              htmlFor="folder-name-empty"
+                              className="text-xs uppercase tracking-[0.12em] text-muted-foreground"
+                              style={{ fontFamily: "var(--font-mono)" }}
+                            >
+                              Folder name
+                            </Label>
+                            <Input
+                              id="folder-name-empty"
+                              value={newFolderName}
+                              onChange={(e) => setNewFolderName(e.target.value)}
+                              placeholder="e.g. Handbooks"
+                              autoFocus
+                            />
+                          </div>
+                          {newFolderError && (
+                            <p className="text-sm text-destructive" role="alert">
+                              {newFolderError}
+                            </p>
+                          )}
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => {
+                                setDialogOpen(false)
+                                setNewFolderName("")
+                                setNewFolderError(null)
+                              }}
+                            >
+                              Cancel
+                            </Button>
+                            <Button type="submit" disabled={creatingFolder}>
+                              {creatingFolder ? "Creating..." : "Create"}
+                            </Button>
+                          </div>
+                        </fieldset>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </SidebarGroupContent>
+            </SidebarGroup>
           ) : (
             <>
               {collegeWideRoots.length > 0 ? (

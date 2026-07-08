@@ -24,5 +24,5 @@ export default async function PermissionsPage() {
     )
   }
 
-  return <PermissionManager role={profile.role} userId={user.id} />
+  return <PermissionManager />
 }
