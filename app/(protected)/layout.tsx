@@ -72,6 +72,13 @@ export default async function ProtectedLayout({
                   </Link>
                 </>
               )}
+              <Link
+                href="/dashboard/recycle-bin"
+                className="rounded-md px-2 py-1 text-xs uppercase tracking-[0.15em] text-white/50 transition-colors hover:bg-white/10 hover:text-white/80"
+                style={{ fontFamily: "var(--font-mono)" }}
+              >
+                Bin
+              </Link>
             </nav>
           </div>
 
