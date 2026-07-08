@@ -210,3 +210,91 @@ export async function PATCH(
     )
   }
 }
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+    const profile = await getUserProfile(user.id)
+    if (!profile) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+    const { id } = await params
+    const url = new URL(request.url)
+    const isPermanent = url.searchParams.get("permanent") === "true"
+
+    if (isPermanent && profile.role !== "dean") {
+      return NextResponse.json({ error: "Only the Dean can permanently delete items" }, { status: 403 })
+    }
+
+    const adminClient = createAdminClient()
+
+    const { data: doc } = await adminClient
+      .from("documents")
+      .select("id, title, folder_id, file_name")
+      .eq("id", id)
+      .single()
+
+    if (!doc) return NextResponse.json({ error: "Document not found" }, { status: 404 })
+
+    if (!isPermanent) {
+      const canDel = await hasDocumentAction(user.id, id, "delete")
+      if (!canDel) return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
+
+      if (doc.folder_id) {
+        const locked = await isFolderLocked(doc.folder_id)
+        if (locked && !(await canBypassLock(user.id))) {
+          return NextResponse.json({ error: "The folder containing this document is locked" }, { status: 403 })
+        }
+      }
+
+      const { error } = await adminClient
+        .from("documents")
+        .update({ deleted_at: new Date().toISOString(), deleted_by: user.id })
+        .eq("id", id)
+
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+      await adminClient.from("audit_logs").insert({
+        user_id: user.id,
+        action: "delete_document",
+        resource_type: "document",
+        resource_id: id,
+      })
+
+      return NextResponse.json({ success: true })
+    }
+
+    const { data: versions } = await adminClient
+      .from("document_versions")
+      .select("file_path")
+      .eq("document_id", id)
+
+    await adminClient.from("document_tags").delete().eq("document_id", id)
+    await adminClient.from("document_versions").delete().eq("document_id", id)
+    await adminClient.from("comments").delete().eq("document_id", id)
+    await adminClient.from("permissions").delete().eq("document_id", id)
+    await adminClient.from("notifications").delete().eq("resource_type", "document").eq("resource_id", id)
+
+    await adminClient.from("documents").delete().eq("id", id)
+
+    await adminClient.from("audit_logs").insert({
+      user_id: user.id,
+      action: "permanent_delete",
+      resource_type: "document",
+      resource_id: id,
+      details: { title: doc.title, versions_deleted: versions?.length ?? 0 },
+    })
+
+    return NextResponse.json({ success: true })
+  } catch {
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    )
+  }
+}
