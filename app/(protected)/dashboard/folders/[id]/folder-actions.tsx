@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { toast } from "sonner"
-import { LockIcon, UnlockIcon, UserPlusIcon } from "lucide-react"
+import { LockIcon, UnlockIcon, UserPlusIcon, ArchiveIcon, ArchiveRestoreIcon, Trash2Icon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
@@ -19,20 +19,27 @@ interface FolderActionsProps {
   folderId: string
   folderName: string
   isLocked: boolean
+  isArchived: boolean
   inheritPermissions: boolean
   ownerName: string
   userRole: string
+  canArchive: boolean
+  canDelete: boolean
 }
 
 export function FolderActions({
   folderId,
   folderName,
   isLocked: initialLocked,
+  isArchived: initialArchived,
   inheritPermissions: initialInherit,
   ownerName,
   userRole,
+  canArchive,
+  canDelete,
 }: FolderActionsProps) {
   const [isLocked, setIsLocked] = useState(initialLocked)
+  const [isArchived, setIsArchived] = useState(initialArchived)
   const [inherit, setInherit] = useState(initialInherit)
   const [loading, setLoading] = useState(false)
   const [transferEmail, setTransferEmail] = useState("")
@@ -76,6 +83,48 @@ export function FolderActions({
       if (res.ok) {
         setInherit(!inherit)
         toast.success(inherit ? "Inheritance disabled" : "Inheritance enabled")
+      } else {
+        const data = await res.json()
+        toast.error(data.error ?? "Failed")
+      }
+    } catch {
+      toast.error("Something went wrong")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleArchive = async () => {
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/folders/${folderId}/archive`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ archive: !isArchived }),
+      })
+      if (res.ok) {
+        setIsArchived(!isArchived)
+        toast.success(isArchived ? "Folder unarchived" : "Folder archived")
+      } else {
+        const data = await res.json()
+        toast.error(data.error ?? "Failed")
+      }
+    } catch {
+      toast.error("Something went wrong")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!confirm(`Move "${folderName}" to the Recycle Bin?`)) return
+
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/folders/${folderId}`, { method: "DELETE" })
+      if (res.ok) {
+        toast.success("Folder moved to Recycle Bin")
+        window.location.href = "/dashboard"
       } else {
         const data = await res.json()
         toast.error(data.error ?? "Failed")
@@ -211,6 +260,52 @@ export function FolderActions({
           Locked
         </span>
       )}
+
+      {isArchived && (
+        <span
+          className="px-2 py-0.5 rounded text-[10px] uppercase tracking-[0.12em] bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+          style={{ fontFamily: "var(--font-mono)" }}
+        >
+          Archived
+        </span>
+      )}
+
+      <div className="ml-auto flex items-center gap-2">
+        {canArchive && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleArchive}
+            disabled={loading}
+            className="gap-1.5"
+          >
+            {isArchived ? (
+              <>
+                <ArchiveRestoreIcon className="size-3.5" />
+                Unarchive
+              </>
+            ) : (
+              <>
+                <ArchiveIcon className="size-3.5" />
+                Archive
+              </>
+            )}
+          </Button>
+        )}
+
+        {canDelete && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleDelete}
+            disabled={loading}
+            className="gap-1.5 border-destructive/30 text-destructive hover:bg-destructive/10"
+          >
+            <Trash2Icon className="size-3.5" />
+            Delete
+          </Button>
+        )}
+      </div>
     </div>
   )
 }

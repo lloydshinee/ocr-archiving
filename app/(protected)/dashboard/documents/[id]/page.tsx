@@ -2,8 +2,10 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/admin-client"
 import { FolderBreadcrumb } from "@/components/folder-breadcrumb"
 import { notFound } from "next/navigation"
-import { FileIcon, DownloadIcon, HistoryIcon, RotateCcwIcon, TagIcon } from "lucide-react"
+import { FileIcon, DownloadIcon, HistoryIcon, RotateCcwIcon, TagIcon, ArchiveIcon } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { DocumentActions } from "./document-actions"
+import { hasDocumentAction } from "@/lib/permission-utils"
 
 export default async function DocumentPage({
   params,
@@ -134,6 +136,14 @@ export default async function DocumentPage({
           <span style={{ fontFamily: "var(--font-mono)" }}>
             {(doc.file_size / 1024 / 1024).toFixed(2)} MB
           </span>
+          {doc.is_archived && (
+            <span
+              className="px-2 py-0.5 rounded text-[10px] uppercase tracking-[0.12em] bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+              style={{ fontFamily: "var(--font-mono)" }}
+            >
+              Archived
+            </span>
+          )}
         </div>
       </div>
 
@@ -159,6 +169,13 @@ export default async function DocumentPage({
           <FileIcon className="size-4" /> Current version (v
           {versions?.find((v) => v.id === doc.current_version_id)?.version_number ?? "?"})
         </a>
+        <DocumentActions
+          documentId={doc.id}
+          documentTitle={doc.title}
+          isArchived={doc.is_archived ?? false}
+          canArchive={await hasDocumentAction(user.id, doc.id, "archive")}
+          canDelete={await hasDocumentAction(user.id, doc.id, "delete")}
+        />
       </div>
 
       {versions && versions.length > 0 && (

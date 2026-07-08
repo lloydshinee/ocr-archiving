@@ -2,11 +2,12 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/admin-client"
 import { FolderBreadcrumb } from "@/components/folder-breadcrumb"
 import { UploadDocumentDialog } from "@/components/upload-document-dialog"
-import { FolderIcon, FileIcon, FileTextIcon } from "lucide-react"
+import { FolderIcon, FileIcon, FileTextIcon, ArchiveIcon } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { notFound } from "next/navigation"
 import { CreateSubfolderDialog } from "./create-subfolder-dialog"
 import { FolderActions } from "./folder-actions"
+import { hasFolderAction } from "@/lib/permission-utils"
 
 export default async function FolderPage({
   params,
@@ -141,9 +142,12 @@ export default async function FolderPage({
               folderId={folder.id}
               folderName={folder.name}
               isLocked={folder.is_locked ?? false}
+              isArchived={folder.is_archived ?? false}
               inheritPermissions={folder.inherit_permissions ?? true}
               ownerName={ownerProfile?.full_name ?? "Unknown"}
               userRole={profile?.role ?? ""}
+              canArchive={await hasFolderAction(user.id, folder.id, "archive")}
+              canDelete={await hasFolderAction(user.id, folder.id, "delete")}
             />
           </div>
         </div>
