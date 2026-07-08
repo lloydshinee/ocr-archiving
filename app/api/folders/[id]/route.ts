@@ -230,8 +230,13 @@ export async function DELETE(
           for (const doc of docs) {
             const { data: versions } = await adminClient
               .from("document_versions")
-              .select("id")
+              .select("id, file_path")
               .eq("document_id", doc.id)
+
+            if (versions && versions.length > 0) {
+              const paths = versions.map((v) => v.file_path)
+              await adminClient.storage.from("documents").remove(paths)
+            }
 
             await adminClient.from("document_tags").delete().eq("document_id", doc.id)
             await adminClient.from("document_versions").delete().eq("document_id", doc.id)

@@ -274,6 +274,11 @@ export async function DELETE(
       .select("file_path")
       .eq("document_id", id)
 
+    if (versions && versions.length > 0) {
+      const paths = versions.map((v) => v.file_path)
+      await adminClient.storage.from("documents").remove(paths)
+    }
+
     await adminClient.from("document_tags").delete().eq("document_id", id)
     await adminClient.from("document_versions").delete().eq("document_id", id)
     await adminClient.from("comments").delete().eq("document_id", id)
