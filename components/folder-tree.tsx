@@ -48,9 +48,15 @@ function FolderTreeItem({
             <span className="truncate">{folder.name}</span>
           </SidebarMenuSubButton>
         ) : (
-          <SidebarMenuButton isActive={isActive} onClick={() => router.push(href)}>
+          <SidebarMenuButton
+            isActive={isActive}
+            tooltip={folder.name}
+            onClick={() => router.push(href)}
+          >
             <FolderIcon className="size-4 shrink-0" />
-            <span className="truncate">{folder.name}</span>
+            <span className="truncate group-data-[collapsible=icon]:hidden">
+              {folder.name}
+            </span>
           </SidebarMenuButton>
         )}
       </Wrapper>
@@ -84,9 +90,15 @@ function FolderTreeItem({
           </div>
         ) : (
           <>
-            <SidebarMenuButton isActive={isActive} onClick={() => router.push(href)}>
+            <SidebarMenuButton
+              isActive={isActive}
+              tooltip={folder.name}
+              onClick={() => router.push(href)}
+            >
               <FolderIcon className="size-4 shrink-0" />
-              <span className="truncate">{folder.name}</span>
+              <span className="truncate group-data-[collapsible=icon]:hidden">
+                {folder.name}
+              </span>
             </SidebarMenuButton>
             <CollapsibleTrigger
               render={
@@ -120,7 +132,7 @@ export function FolderTree({ roots }: { roots: FolderTreeNode[] }) {
       <div className="flex flex-col items-center gap-2 px-3 py-4">
         <FileTextIcon className="size-5 text-sidebar-foreground/25" />
         <p
-          className="text-[11px] uppercase tracking-[0.12em] text-sidebar-foreground/40"
+          className="text-[11px] uppercase tracking-[0.12em] text-sidebar-foreground/40 group-data-[collapsible=icon]:hidden"
           style={{ fontFamily: "var(--font-mono)" }}
         >
           No folders yet

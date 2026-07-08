@@ -161,11 +161,15 @@ export function AppSidebar() {
         <SidebarHeader>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton size="lg" onClick={() => router.push("/dashboard")}>
+              <SidebarMenuButton
+                size="lg"
+                tooltip="CCS Archive"
+                onClick={() => router.push("/dashboard")}
+              >
                 <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
                   <FolderIcon className="size-4" />
                 </div>
-                <div className="flex flex-col gap-0.5 leading-none">
+                <div className="flex-col gap-0.5 leading-none group-data-[collapsible=icon]:hidden flex">
                   <span className="font-semibold">CCS Archive</span>
                   <span
                     className="text-[10px] uppercase tracking-[0.12em] text-sidebar-foreground/40"
@@ -187,7 +191,7 @@ export function AppSidebar() {
               ))}
             </div>
           ) : error ? (
-            <div className="flex flex-col items-center gap-2 px-3 py-6">
+            <div className="flex flex-col items-center gap-2 px-3 py-6 group-data-[collapsible=icon]:hidden">
               <p className="text-xs text-sidebar-foreground/60">{error}</p>
               <button
                 onClick={fetchFolders}
@@ -200,7 +204,7 @@ export function AppSidebar() {
             <div className="flex flex-col items-center gap-3 px-3 py-8">
               <FileTextIcon className="size-6 text-sidebar-foreground/30" />
               <p
-                className="text-[11px] uppercase tracking-[0.12em] text-sidebar-foreground/40 text-center"
+                className="text-[11px] uppercase tracking-[0.12em] text-sidebar-foreground/40 text-center group-data-[collapsible=icon]:hidden"
                 style={{ fontFamily: "var(--font-mono)" }}
               >
                 No folders to show
@@ -277,7 +281,7 @@ export function AppSidebar() {
                     <div className="flex flex-col items-center gap-2 px-3 py-4">
                       <FileTextIcon className="size-5 text-sidebar-foreground/25" />
                       <p
-                        className="text-[11px] uppercase tracking-[0.12em] text-sidebar-foreground/40"
+                        className="text-[11px] uppercase tracking-[0.12em] text-sidebar-foreground/40 group-data-[collapsible=icon]:hidden"
                         style={{ fontFamily: "var(--font-mono)" }}
                       >
                         No folders yet
@@ -303,7 +307,7 @@ export function AppSidebar() {
 
         <SidebarFooter>
           <div
-            className="px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-sidebar-foreground/25"
+            className="px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-sidebar-foreground/25 group-data-[collapsible=icon]:hidden"
             style={{ fontFamily: "var(--font-mono)" }}
           >
             CCS Archive v1.0
