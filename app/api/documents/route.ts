@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/admin-client"
+import { isFolderLocked, canBypassLock, hasFolderAction } from "@/lib/permission-utils"
 
 const ACCEPTED_MIME_TYPES = [
   "application/pdf",
@@ -68,6 +69,16 @@ export async function POST(request: Request) {
 
     if (!folder) {
       return NextResponse.json({ error: "Folder not found" }, { status: 404 })
+    }
+
+    const locked = await isFolderLocked(folderId)
+    if (locked && !(await canBypassLock(user.id))) {
+      return NextResponse.json({ error: "This folder is locked" }, { status: 403 })
+    }
+
+    const canCreate = await hasFolderAction(user.id, folderId, "create")
+    if (!canCreate) {
+      return NextResponse.json({ error: "You don't have permission to upload to this folder" }, { status: 403 })
     }
 
     const docTitle = title?.trim() || file.name.replace(/\.[^.]+$/, "")

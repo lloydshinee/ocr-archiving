@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/admin-client"
+import { isFolderLocked, canBypassLock, hasDocumentAction } from "@/lib/permission-utils"
 
 export async function GET(
   _request: Request,
@@ -62,6 +63,18 @@ export async function POST(
 
     if (!doc) {
       return NextResponse.json({ error: "Document not found" }, { status: 404 })
+    }
+
+    if (doc.folder_id) {
+      const locked = await isFolderLocked(doc.folder_id)
+      if (locked && !(await canBypassLock(user.id))) {
+        return NextResponse.json({ error: "The folder containing this document is locked" }, { status: 403 })
+      }
+    }
+
+    const canEdit = await hasDocumentAction(user.id, id, "edit")
+    if (!canEdit) {
+      return NextResponse.json({ error: "You don't have permission to modify this document" }, { status: 403 })
     }
 
     if (isReplace) {

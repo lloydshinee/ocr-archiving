@@ -25,8 +25,19 @@ export async function PATCH(
 
     if (perm.folder_id) {
       const canManage = await canManagePermissions(user.id, perm.folder_id)
-      if (!canManage) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
+      if (!canManage) return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
+
+      const { data: folder } = await adminClient
+        .from("folders")
+        .select("owner_id")
+        .eq("id", perm.folder_id)
+        .single()
+
+      if (folder && folder.owner_id === perm.user_id) {
+        return NextResponse.json(
+          { error: "Cannot modify the folder owner's baseline permissions" },
+          { status: 403 },
+        )
       }
     }
 
@@ -88,8 +99,19 @@ export async function DELETE(
 
     if (perm.folder_id) {
       const canManage = await canManagePermissions(user.id, perm.folder_id)
-      if (!canManage) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
+      if (!canManage) return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
+
+      const { data: folder } = await adminClient
+        .from("folders")
+        .select("owner_id")
+        .eq("id", perm.folder_id)
+        .single()
+
+      if (folder && folder.owner_id === perm.user_id) {
+        return NextResponse.json(
+          { error: "Cannot revoke the folder owner's baseline permissions" },
+          { status: 403 },
+        )
       }
     }
 
