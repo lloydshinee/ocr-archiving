@@ -240,6 +240,7 @@ export type Database = {
           archived_by: string | null
           category_id: string | null
           created_at: string
+          created_by: string | null
           deleted_at: string | null
           deleted_by: string | null
           id: string
@@ -253,12 +254,14 @@ export type Database = {
           parent_id: string | null
           program_id: string | null
           updated_at: string
+          updated_by: string | null
         }
         Insert: {
           archived_at?: string | null
           archived_by?: string | null
           category_id?: string | null
           created_at?: string
+          created_by?: string | null
           deleted_at?: string | null
           deleted_by?: string | null
           id?: string
@@ -272,12 +275,14 @@ export type Database = {
           parent_id?: string | null
           program_id?: string | null
           updated_at?: string
+          updated_by?: string | null
         }
         Update: {
           archived_at?: string | null
           archived_by?: string | null
           category_id?: string | null
           created_at?: string
+          created_by?: string | null
           deleted_at?: string | null
           deleted_by?: string | null
           id?: string
@@ -291,6 +296,7 @@ export type Database = {
           parent_id?: string | null
           program_id?: string | null
           updated_at?: string
+          updated_by?: string | null
         }
         Relationships: []
       }

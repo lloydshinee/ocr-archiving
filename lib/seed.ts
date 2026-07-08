@@ -39,11 +39,36 @@ export async function seedReferenceData() {
 
   if (count && count > 0) return
 
-  await adminClient.from("programs").insert(PROGRAMS)
+  const { data: programs } = await adminClient
+    .from("programs")
+    .insert(PROGRAMS)
+    .select("id, name")
+
   await adminClient
     .from("categories")
     .insert(CATEGORIES.map((name) => ({ name })))
   await adminClient
     .from("document_types")
     .insert(DOCUMENT_TYPES.map((name) => ({ name })))
+
+  if (programs && programs.length > 0) {
+    const { data: dean } = await adminClient
+      .from("users")
+      .select("id")
+      .eq("role", "dean")
+      .single()
+
+    if (!dean?.id) return
+
+    const programFolders = programs.map((p) => ({
+      name: p.name,
+      program_id: p.id,
+      parent_id: null,
+      owner_id: dean.id,
+      created_by: dean.id,
+      inherit_permissions: true,
+    }))
+
+    await adminClient.from("folders").insert(programFolders)
+  }
 }
