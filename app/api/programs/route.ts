@@ -54,6 +54,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Failed to create program." }, { status: 500 })
     }
 
+    await adminClient.from("folders").insert({
+      name: data.name,
+      program_id: data.id,
+      parent_id: null,
+      owner_id: user.id,
+      created_by: user.id,
+      inherit_permissions: true,
+    })
+
     return NextResponse.json({ program: data }, { status: 201 })
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
