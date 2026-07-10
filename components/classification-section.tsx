@@ -86,7 +86,7 @@ export function ClassificationSection({
           setLoading(false)
           return
         }
-        setItems(data.items ?? data.categories ?? data.documentTypes ?? [])
+        setItems(data.items ?? data.categories ?? data.documentTypes ?? data.programs ?? [])
         setLoading(false)
       } catch {
         setError("Could not reach the server.")
