@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState } from "react"
 import { FolderIcon, FileTextIcon, PlusIcon } from "lucide-react"
 import {
   Sidebar,
@@ -48,7 +48,7 @@ export function AppSidebar() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [showArchived, setShowArchived] = useState(false)
 
-  const fetchFolders = useCallback(async () => {
+  async function refetchFolders() {
     try {
       setLoading(true)
       setError(null)
@@ -71,11 +71,13 @@ export function AppSidebar() {
     } finally {
       setLoading(false)
     }
-  }, [showArchived])
+  }
 
   useEffect(() => {
-    fetchFolders()
-  }, [fetchFolders])
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    refetchFolders()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showArchived])
 
   const programMap = new Map(programs.map((p) => [p.id, p.name]))
 
@@ -146,7 +148,7 @@ export function AppSidebar() {
       toast.success("Folder created")
       setDialogOpen(false)
       setNewFolderName("")
-      fetchFolders()
+      refetchFolders()
     } catch {
       setNewFolderError("Something went wrong")
     } finally {
@@ -211,7 +213,7 @@ export function AppSidebar() {
             <div className="flex flex-col items-center gap-2 px-3 py-6 group-data-[collapsible=icon]:hidden">
               <p className="text-xs text-sidebar-foreground/60">{error}</p>
               <button
-                onClick={fetchFolders}
+                onClick={refetchFolders}
                 className="text-xs text-sidebar-primary hover:underline"
               >
                 Retry

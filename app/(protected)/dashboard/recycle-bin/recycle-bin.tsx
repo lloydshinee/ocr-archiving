@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
 import { toast } from "sonner"
 import { Trash2Icon, RotateCcwIcon, FolderIcon, FileIcon, AlertTriangleIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -26,8 +26,9 @@ export function RecycleBin({ isDean }: { isDean: boolean }) {
   const [restoring, setRestoring] = useState<Set<string>>(new Set())
   const [purging, setPurging] = useState<Set<string>>(new Set())
 
-  const fetchItems = useCallback(async () => {
+  async function reloadItems() {
     try {
+      setLoading(true)
       const res = await fetch("/api/recycle-bin")
       if (!res.ok) throw new Error("Failed to load recycle bin")
       const data = await res.json()
@@ -37,11 +38,12 @@ export function RecycleBin({ isDean }: { isDean: boolean }) {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }
 
   useEffect(() => {
-    fetchItems()
-  }, [fetchItems])
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    reloadItems()
+  }, [])
 
   const handleRestore = async (item: BinItem) => {
     setRestoring((prev) => new Set(prev).add(item.id))
@@ -57,7 +59,7 @@ export function RecycleBin({ isDean }: { isDean: boolean }) {
         return
       }
       toast.success(`${item.type === "folder" ? "Folder" : "Document"} restored`)
-      fetchItems()
+      reloadItems()
     } catch {
       toast.error("Something went wrong")
     } finally {
@@ -85,7 +87,7 @@ export function RecycleBin({ isDean }: { isDean: boolean }) {
         return
       }
       toast.success("Item permanently deleted")
-      fetchItems()
+      reloadItems()
     } catch {
       toast.error("Something went wrong")
     } finally {

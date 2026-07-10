@@ -33,7 +33,7 @@ export async function POST(
     if (archive) {
       await archiveFolderWithChildren(adminClient, id, user.id, now)
     } else {
-      await unarchiveFolderWithChildren(adminClient, id, now)
+      await unarchiveFolderWithChildren(adminClient, id)
     }
 
     await adminClient.from("audit_logs").insert({
@@ -106,7 +106,6 @@ async function archiveFolderWithChildren(
 async function unarchiveFolderWithChildren(
   adminClient: ReturnType<typeof createAdminClient>,
   folderId: string,
-  now: string,
 ) {
   const allIds = await collectDescendantIds(adminClient, folderId)
 

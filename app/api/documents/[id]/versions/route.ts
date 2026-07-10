@@ -3,6 +3,15 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/admin-client"
 import { isFolderLocked, canBypassLock, hasDocumentAction } from "@/lib/permission-utils"
 
+const TEXT_EXTRACTABLE_TYPES = [
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "text/plain",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+]
+
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -134,6 +143,14 @@ export async function POST(
             updated_at: new Date().toISOString(),
           })
           .eq("id", id)
+
+        if (TEXT_EXTRACTABLE_TYPES.includes(file.type)) {
+          await adminClient.from("ocr_jobs").insert({
+            version_id: version.id,
+            document_id: id,
+            status: "pending",
+          })
+        }
       }
 
       return NextResponse.json({ version })
@@ -193,7 +210,6 @@ export async function POST(
         file_size: targetVersion.file_size,
         file_type: targetVersion.file_type,
         created_by: user.id,
-        ocr_text: targetVersion.ocr_text,
       })
       .select()
       .single()
@@ -206,6 +222,14 @@ export async function POST(
           updated_at: new Date().toISOString(),
         })
         .eq("id", id)
+
+      if (TEXT_EXTRACTABLE_TYPES.includes(targetVersion.file_type)) {
+        await adminClient.from("ocr_jobs").insert({
+          version_id: restoredVersion.id,
+          document_id: id,
+          status: "pending",
+        })
+      }
     }
 
     await adminClient.from("audit_logs").insert({

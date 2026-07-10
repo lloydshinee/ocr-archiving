@@ -14,6 +14,15 @@ const ACCEPTED_MIME_TYPES = [
   "application/zip",
 ]
 
+const TEXT_EXTRACTABLE_TYPES = [
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "text/plain",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+]
+
 const MAX_FILE_SIZE = 100 * 1024 * 1024
 
 export async function POST(request: Request) {
@@ -145,6 +154,14 @@ export async function POST(request: Request) {
         .from("documents")
         .update({ current_version_id: version.id })
         .eq("id", doc.id)
+
+      if (TEXT_EXTRACTABLE_TYPES.includes(file.type)) {
+        await adminClient.from("ocr_jobs").insert({
+          version_id: version.id,
+          document_id: doc.id,
+          status: "pending",
+        })
+      }
     }
 
     if (tagNames.length > 0) {

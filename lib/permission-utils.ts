@@ -43,7 +43,7 @@ export async function hasFolderAction(
     return true
   }
 
-  const resolvedFolderId = await resolvePermissionFolder(folderId, folder.parent_id)
+  const resolvedFolderId = await resolvePermissionFolder(folderId)
   const { data: perm } = await adminClient
     .from("permissions")
     .select("actions")
@@ -98,7 +98,6 @@ export async function hasDocumentAction(
 
 export async function resolvePermissionFolder(
   folderId: string,
-  parentId: string | null,
 ): Promise<string> {
   const adminClient = createAdminClient()
 
@@ -202,7 +201,7 @@ export async function getFolderEffectivePermissions(
 ): Promise<{ userId: string; userFullName: string; actions: string[]; assignedBy: string; assignedByName: string; assignedDate: string }[]> {
   const adminClient = createAdminClient()
 
-  const resolvedId = await resolvePermissionFolder(folderId, null)
+  const resolvedId = await resolvePermissionFolder(folderId)
 
   const { data } = await adminClient
     .from("permissions")
@@ -211,13 +210,13 @@ export async function getFolderEffectivePermissions(
 
   if (!data) return []
 
-  return data.map((p) => ({
-    id: (p as any).id,
-    userId: (p as any).user_id,
-    userFullName: (p as any).users?.full_name ?? "Unknown",
-    actions: (p as any).actions,
-    assignedBy: (p as any).assigned_by,
-    assignedByName: (p as any).assigned_by_user?.full_name ?? "Unknown",
-    assignedDate: (p as any).created_at,
+  return data.map((p: Record<string, unknown>) => ({
+    id: p.id as string,
+    userId: p.user_id as string,
+    userFullName: (p.users as Record<string, unknown> | undefined)?.full_name as string ?? "Unknown",
+    actions: p.actions as string[],
+    assignedBy: p.assigned_by as string,
+    assignedByName: (p.assigned_by_user as Record<string, unknown> | undefined)?.full_name as string ?? "Unknown",
+    assignedDate: p.created_at as string,
   }))
 }

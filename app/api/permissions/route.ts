@@ -71,6 +71,7 @@ export async function POST(request: Request) {
 
     const { data: created, error } = await adminClient
       .from("permissions")
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .insert(insertData as any)
       .select()
       .single()

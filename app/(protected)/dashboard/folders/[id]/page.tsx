@@ -1,13 +1,12 @@
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/admin-client"
 import { FolderBreadcrumb } from "@/components/folder-breadcrumb"
-import { UploadDocumentDialog } from "@/components/upload-document-dialog"
-import { FolderIcon, FileIcon, FileTextIcon, ArchiveIcon } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
+import { DocumentDialog } from "@/components/document-dialog"
 import { notFound } from "next/navigation"
 import { CreateSubfolderDialog } from "./create-subfolder-dialog"
 import { FolderActions } from "./folder-actions"
 import { hasFolderAction } from "@/lib/permission-utils"
+import { FolderContent } from "./folder-content"
 
 export default async function FolderPage({
   params,
@@ -92,14 +91,6 @@ export default async function FolderPage({
     }
   }
 
-  const fileTypeIcon = (mime: string) => {
-    if (mime.includes("pdf")) return <FileIcon className="size-4 shrink-0" />
-    if (mime.includes("image")) return <FileIcon className="size-4 shrink-0 text-orange-400" />
-    if (mime.includes("spreadsheet")) return <FileIcon className="size-4 shrink-0 text-green-500" />
-    if (mime.includes("presentation")) return <FileIcon className="size-4 shrink-0 text-red-400" />
-    return <FileIcon className="size-4 shrink-0 text-muted-foreground" />
-  }
-
   return (
     <div className="flex flex-col gap-6">
       <FolderBreadcrumb items={breadcrumbs} />
@@ -155,87 +146,21 @@ export default async function FolderPage({
         <div className="flex items-center gap-2">
           {canCreate && (
             <>
-              <UploadDocumentDialog folderId={folder.id} folderName={folder.name} />
+              <DocumentDialog mode="upload" folderId={folder.id} folderName={folder.name} />
               <CreateSubfolderDialog parentId={folder.id} parentName={folder.name} />
             </>
           )}
         </div>
       </div>
 
-      {(subfolders && subfolders.length > 0) || (documents && documents.length > 0) ? (
-        <div className="rounded-xl border bg-card shadow-sm">
-          <div className="divide-y">
-            {subfolders?.map((sf) => (
-              <div
-                key={sf.id}
-                className="flex items-center justify-between gap-4 px-5 py-3.5 hover:bg-muted/50 transition-colors"
-              >
-                <a
-                  href={`/dashboard/folders/${sf.id}`}
-                  className="flex items-center gap-3 min-w-0 flex-1"
-                >
-                  <FolderIcon className="size-4 shrink-0 text-primary" />
-                  <span className="truncate text-sm">{sf.name}</span>
-                </a>
-                <span
-                  className="shrink-0 text-[11px] text-muted-foreground/50"
-                  style={{ fontFamily: "var(--font-mono)" }}
-                >
-                  {new Date(sf.updated_at).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                  })}
-                </span>
-              </div>
-            ))}
-
-            {documents?.map((doc) => (
-              <div
-                key={doc.id}
-                className="flex items-center justify-between gap-4 px-5 py-3.5 hover:bg-muted/50 transition-colors"
-              >
-                <a
-                  href={`/dashboard/documents/${doc.id}`}
-                  className="flex items-center gap-3 min-w-0 flex-1"
-                >
-                  {fileTypeIcon(doc.file_type)}
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="truncate text-sm">{doc.title}</span>
-                      <Badge variant="outline" className="text-[10px] shrink-0">
-                        {versionCounts.get(doc.id) ?? 1} version{(versionCounts.get(doc.id) ?? 1) !== 1 ? "s" : ""}
-                      </Badge>
-                    </div>
-                    <div className="mt-0.5 flex items-center gap-3 text-[11px] text-muted-foreground/50">
-                      <span>{documentOwners.get(doc.owner_id) ?? "Unknown"}</span>
-                      <span style={{ fontFamily: "var(--font-mono)" }}>
-                        {new Date(doc.created_at).toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        })}
-                      </span>
-                    </div>
-                  </div>
-                </a>
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-col items-center gap-3 py-16 rounded-xl border bg-card shadow-sm">
-          <FileTextIcon className="size-8 text-muted-foreground/30" />
-          <p className="text-sm text-muted-foreground mt-1">
-            This folder is empty
-          </p>
-          <p
-            className="text-[11px] text-muted-foreground/50"
-            style={{ fontFamily: "var(--font-mono)" }}
-          >
-            Upload a document or create a subfolder
-          </p>
-        </div>
-      )}
+      <FolderContent
+        folderId={folder.id}
+        folderName={folder.name}
+        subfolders={subfolders ?? []}
+        documents={documents ?? []}
+        versionCounts={versionCounts}
+        documentOwners={documentOwners}
+      />
     </div>
   )
 }

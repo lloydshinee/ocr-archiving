@@ -1,73 +1,98 @@
-import { createClient } from "@/lib/supabase/server"
-import { createAdminClient } from "@/lib/admin-client"
-import { FolderBreadcrumb } from "@/components/folder-breadcrumb"
-import { notFound } from "next/navigation"
-import { FileIcon, DownloadIcon, HistoryIcon, RotateCcwIcon, TagIcon, ArchiveIcon } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
-import { DocumentActions } from "./document-actions"
-import { hasDocumentAction } from "@/lib/permission-utils"
+import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/admin-client";
+import { FolderBreadcrumb } from "@/components/folder-breadcrumb";
+import { DocumentDialog } from "@/components/document-dialog";
+import { notFound } from "next/navigation";
+import { ViewButton } from "./view-button";
+import {
+  FileIcon,
+  DownloadIcon,
+  HistoryIcon,
+  TagIcon,
+} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { DocumentActions } from "./document-actions";
+import { VersionActions } from "@/components/version-actions";
+import { hasDocumentAction } from "@/lib/permission-utils";
+import { OcrStatusBadge } from "@/components/ocr-status-badge";
+import { isOcrEligible } from "@/lib/search-utils";
 
 export default async function DocumentPage({
   params,
 }: {
-  params: Promise<{ id: string }>
+  params: Promise<{ id: string }>;
 }) {
-  const { id } = await params
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) notFound()
+  const { id } = await params;
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) notFound();
 
-  const adminClient = createAdminClient()
+  const adminClient = createAdminClient();
 
   const { data: doc } = await adminClient
     .from("documents")
     .select("*")
     .eq("id", id)
     .is("deleted_at", null)
-    .single()
+    .single();
 
-  if (!doc) notFound()
+  if (!doc) notFound();
 
   const categoryPromise = doc.category_id
-    ? adminClient.from("categories").select("name").eq("id", doc.category_id).single()
-    : Promise.resolve({ data: null })
+    ? adminClient
+        .from("categories")
+        .select("name")
+        .eq("id", doc.category_id)
+        .single()
+    : Promise.resolve({ data: null });
 
   const docTypePromise = doc.document_type_id
-    ? adminClient.from("document_types").select("name").eq("id", doc.document_type_id).single()
-    : Promise.resolve({ data: null })
+    ? adminClient
+        .from("document_types")
+        .select("name")
+        .eq("id", doc.document_type_id)
+        .single()
+    : Promise.resolve({ data: null });
 
   const { data: tagLinks } = await adminClient
     .from("document_tags")
     .select("tag_id")
-    .eq("document_id", id)
+    .eq("document_id", id);
 
-  let tags: { id: string; name: string }[] = []
+  let tags: { id: string; name: string }[] = [];
   if (tagLinks && tagLinks.length > 0) {
     const { data: tagData } = await adminClient
       .from("tags")
       .select("id, name")
-      .in("id", tagLinks.map((t) => t.tag_id))
-    tags = tagData ?? []
+      .in(
+        "id",
+        tagLinks.map((t) => t.tag_id),
+      );
+    tags = tagData ?? [];
   }
 
   const { data: versions } = await adminClient
     .from("document_versions")
     .select("*")
     .eq("document_id", id)
-    .order("version_number", { ascending: false })
+    .order("version_number", { ascending: false });
 
   const { data: owner } = await adminClient
     .from("users")
     .select("full_name")
     .eq("id", doc.owner_id)
-    .single()
+    .single();
 
   const [{ data: categoryData }, { data: docTypeData }] = await Promise.all([
     categoryPromise,
     docTypePromise,
-  ])
+  ]);
 
-  const breadcrumbs = await getFolderPath(doc.folder_id)
+  const currentVersion = versions?.find((v) => v.id === doc.current_version_id);
+
+  const breadcrumbs = await getFolderPath(doc.folder_id);
 
   return (
     <div className="flex flex-col gap-6">
@@ -131,7 +156,8 @@ export default async function DocumentPage({
             </span>
           </span>
           <span style={{ fontFamily: "var(--font-mono)" }}>
-            {versions?.length ?? 0} version{(versions?.length ?? 0) !== 1 ? "s" : ""}
+            {versions?.length ?? 0} version
+            {(versions?.length ?? 0) !== 1 ? "s" : ""}
           </span>
           <span style={{ fontFamily: "var(--font-mono)" }}>
             {(doc.file_size / 1024 / 1024).toFixed(2)} MB
@@ -144,6 +170,12 @@ export default async function DocumentPage({
               Archived
             </span>
           )}
+          {currentVersion && isOcrEligible(doc.file_type) && (
+            <OcrStatusBadge
+              status={currentVersion.ocr_status}
+              versionId={currentVersion.id}
+            />
+          )}
         </div>
       </div>
 
@@ -155,10 +187,15 @@ export default async function DocumentPage({
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 items-center">
+        <ViewButton
+          documentId={doc.id}
+          title={doc.title}
+          fileType={doc.file_type}
+        />
         <a
           href={`/api/documents/${doc.id}/download`}
-          className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors"
+          className="inline-flex items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium shadow-sm hover:bg-accent hover:text-accent-foreground transition-colors"
         >
           <DownloadIcon className="size-4" /> Download
         </a>
@@ -167,8 +204,23 @@ export default async function DocumentPage({
           className="inline-flex items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium shadow-sm hover:bg-accent hover:text-accent-foreground transition-colors"
         >
           <FileIcon className="size-4" /> Current version (v
-          {versions?.find((v) => v.id === doc.current_version_id)?.version_number ?? "?"})
+          {versions?.find((v) => v.id === doc.current_version_id)
+            ?.version_number ?? "?"}
+          )
         </a>
+        <DocumentDialog
+          mode="edit"
+          folderId={doc.folder_id ?? ""}
+          folderName=""
+          document={{
+            id: doc.id,
+            title: doc.title,
+            description: doc.description,
+            category_id: doc.category_id,
+            document_type_id: doc.document_type_id,
+            tags,
+          }}
+        />
         <DocumentActions
           documentId={doc.id}
           documentTitle={doc.title}
@@ -229,30 +281,15 @@ export default async function DocumentPage({
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <a
-                      href={`/api/documents/${doc.id}/download?version=${v.id}`}
-                      className="rounded p-1.5 text-muted-foreground hover:text-foreground transition-colors"
-                      title="Download this version"
-                    >
-                      <DownloadIcon className="size-3.5" />
-                    </a>
-                    {v.id !== doc.current_version_id && (
-                      <form
-                        action={`/api/documents/${doc.id}/versions`}
-                        method="POST"
-                      >
-                        <input type="hidden" name="versionId" value={v.id} />
-                        <button
-                          type="submit"
-                          className="rounded p-1.5 text-muted-foreground hover:text-foreground transition-colors"
-                          title="Restore this version"
-                        >
-                          <RotateCcwIcon className="size-3.5" />
-                        </button>
-                      </form>
-                    )}
-                  </div>
+                  <VersionActions
+                    documentId={doc.id}
+                    versionId={v.id}
+                    versionNumber={v.version_number}
+                    fileName={v.file_path.split("/").pop() ?? ""}
+                    fileType={v.file_type}
+                    isCurrent={v.id === doc.current_version_id}
+                    title={doc.title}
+                  />
                 </div>
               ))}
             </div>
@@ -260,15 +297,15 @@ export default async function DocumentPage({
         </div>
       )}
     </div>
-  )
+  );
 }
 
 async function getFolderPath(
   folderId: string,
 ): Promise<{ id: string; name: string }[]> {
-  const adminClient = createAdminClient()
-  const breadcrumbs: { id: string; name: string }[] = []
-  let currentId: string | null = folderId
+  const adminClient = createAdminClient();
+  const breadcrumbs: { id: string; name: string }[] = [];
+  let currentId: string | null = folderId;
 
   while (currentId) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -277,15 +314,19 @@ async function getFolderPath(
       .select("id, name, parent_id")
       .eq("id", currentId)
       .is("deleted_at", null)
-      .single()
+      .single();
 
-    const folder = result.data as { id: string; name: string; parent_id: string | null } | null
+    const folder = result.data as {
+      id: string;
+      name: string;
+      parent_id: string | null;
+    } | null;
 
-    if (!folder) break
+    if (!folder) break;
 
-    breadcrumbs.unshift({ id: folder.id, name: folder.name })
-    currentId = folder.parent_id
+    breadcrumbs.unshift({ id: folder.id, name: folder.name });
+    currentId = folder.parent_id;
   }
 
-  return breadcrumbs
+  return breadcrumbs;
 }

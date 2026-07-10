@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { FolderIcon, FileTextIcon, ChevronRightIcon, ArchiveIcon } from "lucide-react"
+import { FolderIcon, FileTextIcon, ChevronRightIcon } from "lucide-react"
 import { useRouter, usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import {

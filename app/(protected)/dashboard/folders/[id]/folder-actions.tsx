@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { toast } from "sonner"
 import { LockIcon, UnlockIcon, UserPlusIcon, ArchiveIcon, ArchiveRestoreIcon, Trash2Icon } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -124,7 +124,7 @@ export function FolderActions({
       const res = await fetch(`/api/folders/${folderId}`, { method: "DELETE" })
       if (res.ok) {
         toast.success("Folder moved to Recycle Bin")
-        window.location.href = "/dashboard"
+        window.history.back()
       } else {
         const data = await res.json()
         toast.error(data.error ?? "Failed")

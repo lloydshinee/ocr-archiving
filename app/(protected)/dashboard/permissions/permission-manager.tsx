@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback, useMemo } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { toast } from "sonner"
 import { Trash2Icon, FolderPlusIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -99,7 +99,7 @@ export function PermissionManager() {
     load()
   }, [])
 
-  const fetchPermissions = useCallback(async (folderId: string) => {
+  async function loadPermissions(folderId: string) {
     if (!folderId) {
       setFolderPermissions([])
       return
@@ -119,11 +119,12 @@ export function PermissionManager() {
     } finally {
       setPermsLoading(false)
     }
-  }, [])
+  }
 
   useEffect(() => {
-    fetchPermissions(selectedFolder)
-  }, [selectedFolder, fetchPermissions])
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadPermissions(selectedFolder)
+  }, [selectedFolder])
 
   const toggleAction = (action: PermAction) => {
     setSelectedActions((prev) => {
@@ -157,7 +158,7 @@ export function PermissionManager() {
       toast.success("Permission granted")
       setSelectedActions(new Set())
       setSelectedUser("")
-      fetchPermissions(selectedFolder)
+      loadPermissions(selectedFolder)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Something went wrong")
     } finally {
@@ -173,7 +174,7 @@ export function PermissionManager() {
         throw new Error(data.error ?? "Failed")
       }
       toast.success("Permission revoked")
-      fetchPermissions(selectedFolder)
+      loadPermissions(selectedFolder)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Something went wrong")
     }
@@ -191,14 +192,13 @@ export function PermissionManager() {
         throw new Error(data.error ?? "Failed")
       }
       toast.success(add ? "Action added" : "Action removed")
-      fetchPermissions(selectedFolder)
+      loadPermissions(selectedFolder)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Something went wrong")
     }
   }
 
   const allActionsSelected = ALL_ACTIONS.every((a) => selectedActions.has(a))
-  const someActionsSelected = ALL_ACTIONS.some((a) => selectedActions.has(a))
 
   const toggleAllActions = () => {
     if (allActionsSelected) {

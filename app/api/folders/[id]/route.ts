@@ -182,6 +182,7 @@ export async function PATCH(
 
     const { data: folder, error } = await adminClient
       .from("folders")
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .update(updateData as any)
       .eq("id", id)
       .select()
@@ -219,6 +220,8 @@ export async function DELETE(
 
     if (isPermanent) {
       const allIds = await collectAllDescendantIds(adminClient, id)
+      // Delete children before parents (parent_id FK constraint)
+      allIds.reverse()
 
       for (const fid of allIds) {
         const { data: docs } = await adminClient
@@ -228,6 +231,12 @@ export async function DELETE(
 
         if (docs) {
           for (const doc of docs) {
+            // Must null out current_version_id before deleting versions (FK constraint)
+            await adminClient
+              .from("documents")
+              .update({ current_version_id: null })
+              .eq("id", doc.id)
+
             const { data: versions } = await adminClient
               .from("document_versions")
               .select("id, file_path")

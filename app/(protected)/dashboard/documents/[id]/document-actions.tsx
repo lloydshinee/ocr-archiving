@@ -53,7 +53,7 @@ export function DocumentActions({
       const res = await fetch(`/api/documents/${documentId}`, { method: "DELETE" })
       if (res.ok) {
         toast.success("Document moved to Recycle Bin")
-        window.location.href = "/dashboard"
+        window.history.back()
       } else {
         const data = await res.json()
         toast.error(data.error ?? "Failed")

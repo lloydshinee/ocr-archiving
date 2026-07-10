@@ -24,7 +24,7 @@ export async function POST(
 
     if (!folder) return NextResponse.json({ error: "Folder not found in recycle bin" }, { status: 404 })
 
-    await restoreFolderTree(adminClient, folder, user.id)
+    await restoreFolderTree(adminClient, folder)
 
     await adminClient.from("audit_logs").insert({
       user_id: user.id,
@@ -42,7 +42,6 @@ export async function POST(
 async function restoreFolderTree(
   adminClient: ReturnType<typeof createAdminClient>,
   folder: { id: string; parent_id: string | null },
-  userId: string,
 ) {
   const allIds = await collectDeletedDescendantIds(adminClient, folder.id)
 

@@ -269,6 +269,12 @@ export async function DELETE(
       return NextResponse.json({ success: true })
     }
 
+    // Must null out current_version_id before deleting versions (FK constraint)
+    await adminClient
+      .from("documents")
+      .update({ current_version_id: null })
+      .eq("id", id)
+
     const { data: versions } = await adminClient
       .from("document_versions")
       .select("file_path")
@@ -285,7 +291,8 @@ export async function DELETE(
     await adminClient.from("permissions").delete().eq("document_id", id)
     await adminClient.from("notifications").delete().eq("resource_type", "document").eq("resource_id", id)
 
-    await adminClient.from("documents").delete().eq("id", id)
+    const { error: deleteError } = await adminClient.from("documents").delete().eq("id", id)
+    if (deleteError) return NextResponse.json({ error: deleteError.message }, { status: 500 })
 
     await adminClient.from("audit_logs").insert({
       user_id: user.id,

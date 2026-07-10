@@ -8,6 +8,7 @@ import {
   SidebarInset,
 } from "@/components/ui/sidebar"
 import Link from "next/link"
+import { SearchIcon } from "lucide-react"
 
 export default async function ProtectedLayout({
   children,
@@ -64,6 +65,20 @@ export default async function ProtectedLayout({
                     Users
                   </Link>
                   <Link
+                    href="/dashboard/categories"
+                    className="rounded-md px-2 py-1 text-xs uppercase tracking-[0.15em] text-white/50 transition-colors hover:bg-white/10 hover:text-white/80"
+                    style={{ fontFamily: "var(--font-mono)" }}
+                  >
+                    Classification
+                  </Link>
+                  <Link
+                    href="/dashboard/programs"
+                    className="rounded-md px-2 py-1 text-xs uppercase tracking-[0.15em] text-white/50 transition-colors hover:bg-white/10 hover:text-white/80"
+                    style={{ fontFamily: "var(--font-mono)" }}
+                  >
+                    Programs
+                  </Link>
+                  <Link
                     href="/dashboard/permissions"
                     className="rounded-md px-2 py-1 text-xs uppercase tracking-[0.15em] text-white/50 transition-colors hover:bg-white/10 hover:text-white/80"
                     style={{ fontFamily: "var(--font-mono)" }}
@@ -83,6 +98,21 @@ export default async function ProtectedLayout({
           </div>
 
           <div className="flex items-center gap-4">
+            <form
+              action="/dashboard/search"
+              method="GET"
+              className="hidden sm:flex items-center"
+            >
+              <div className="relative">
+                <SearchIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-white/30" />
+                <input
+                  type="text"
+                  name="q"
+                  placeholder="Search..."
+                  className="w-48 rounded-md border border-white/10 bg-white/5 pl-8 pr-3 py-1.5 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-white/20 focus:bg-white/10 transition-colors"
+                />
+              </div>
+            </form>
             {profile && (
               <div className="hidden items-center gap-2 text-sm text-white/75 md:flex">
                 <span className="truncate max-w-[120px]">

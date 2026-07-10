@@ -190,6 +190,7 @@ export type Database = {
           id: string
           is_archived: boolean
           owner_id: string
+          search_vector: unknown
           title: string
           updated_at: string
         }
@@ -211,6 +212,7 @@ export type Database = {
           id?: string
           is_archived?: boolean
           owner_id: string
+          search_vector?: unknown
           title: string
           updated_at?: string
         }
@@ -232,6 +234,7 @@ export type Database = {
           id?: string
           is_archived?: boolean
           owner_id?: string
+          search_vector?: unknown
           title?: string
           updated_at?: string
         }
@@ -257,6 +260,7 @@ export type Database = {
           owner_id: string
           parent_id: string | null
           program_id: string | null
+          search_vector: unknown
           updated_at: string
           updated_by: string | null
         }
@@ -279,6 +283,7 @@ export type Database = {
           owner_id: string
           parent_id?: string | null
           program_id?: string | null
+          search_vector?: unknown
           updated_at?: string
           updated_by?: string | null
         }
@@ -301,6 +306,7 @@ export type Database = {
           owner_id?: string
           parent_id?: string | null
           program_id?: string | null
+          search_vector?: unknown
           updated_at?: string
           updated_by?: string | null
         }
@@ -339,6 +345,42 @@ export type Database = {
           title?: string
           type?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      ocr_jobs: {
+        Row: {
+          id: string
+          version_id: string
+          document_id: string
+          status: string
+          error_message: string | null
+          retry_count: number
+          created_at: string
+          started_at: string | null
+          completed_at: string | null
+        }
+        Insert: {
+          id?: string
+          version_id: string
+          document_id: string
+          status?: string
+          error_message?: string | null
+          retry_count?: number
+          created_at?: string
+          started_at?: string | null
+          completed_at?: string | null
+        }
+        Update: {
+          id?: string
+          version_id?: string
+          document_id?: string
+          status?: string
+          error_message?: string | null
+          retry_count?: number
+          created_at?: string
+          started_at?: string | null
+          completed_at?: string | null
         }
         Relationships: []
       }
@@ -459,9 +501,43 @@ export type Database = {
     }
     Views: Record<string, never>
     Functions: {
+      get_folder_path: {
+        Args: { p_folder_id: string }
+        Returns: string
+      }
       get_program_folder_subtree: {
         Args: { p_program_id: string }
         Returns: Database["public"]["Tables"]["folders"]["Row"][]
+      }
+      search_archives: {
+        Args: {
+          p_query: string
+          p_category_id?: string
+          p_document_type_id?: string
+          p_owner_id?: string
+          p_date_from?: string
+          p_date_to?: string
+          p_file_type?: string
+          p_limit?: number
+          p_offset?: number
+        }
+        Returns: {
+          id: string
+          result_type: string
+          title: string
+          description: string | null
+          folder_id: string
+          folder_path: string | null
+          created_at: string
+          updated_at: string
+          owner_id: string
+          owner_name: string
+          file_type: string | null
+          file_size: number | null
+          ocr_status: string | null
+          match_headline: string | null
+          rank: number
+        }[]
       }
     }
     Enums: {

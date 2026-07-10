@@ -54,10 +54,12 @@ export function FolderCombobox({
   }, [])
 
   useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect */
     if (open) {
       setQuery("")
       setTimeout(() => inputRef.current?.focus(), 50)
     }
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [open])
 
   return (
