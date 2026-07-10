@@ -76,10 +76,6 @@ export async function hasDocumentAction(
 
   if (doc.owner_id === userId) return true
 
-  if (action === "move") {
-    return true
-  }
-
   const { data: docPerm } = await adminClient
     .from("permissions")
     .select("actions")

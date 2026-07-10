@@ -150,7 +150,7 @@ export async function PATCH(
       updateData.folder_id = folderId
     }
 
-    if (isDean && categoryId !== undefined) {
+    if ((isDean || profile.role === "program_head") && categoryId !== undefined) {
       updateData.category_id = categoryId
     }
 
