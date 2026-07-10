@@ -72,12 +72,15 @@ export function ClassificationSection({
   const [items, setItems] = useState<Item[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
   const [createOpen, setCreateOpen] = useState(false)
   const [editing, setEditing] = useState<Item | null>(null)
   const [deleting, setDeleting] = useState<Item | null>(null)
 
   useEffect(() => {
     async function load() {
+      setLoading(true)
+      setError(null)
       try {
         const res = await fetch(apiBase)
         const data = await res.json()
@@ -94,7 +97,7 @@ export function ClassificationSection({
       }
     }
     load()
-  }, [apiBase])
+  }, [apiBase, refreshKey])
 
   if (error) {
     return (
@@ -210,7 +213,7 @@ export function ClassificationSection({
         apiBase={apiBase}
         itemLabel={itemLabel}
         createDescription={createDescription}
-        onDone={() => { setItems([]); setLoading(true); setError(null); }}
+        onDone={() => setRefreshKey((k) => k + 1)}
       />
 
       {editing && (
@@ -220,7 +223,7 @@ export function ClassificationSection({
           apiBase={apiBase}
           item={editing}
           itemLabel={itemLabel}
-          onDone={() => { setItems([]); setLoading(true); setError(null); }}
+          onDone={() => setRefreshKey((k) => k + 1)}
         />
       )}
 
@@ -231,7 +234,7 @@ export function ClassificationSection({
           apiBase={apiBase}
           item={deleting}
           itemLabel={itemLabel}
-          onDone={() => { setItems([]); setLoading(true); setError(null); }}
+          onDone={() => setRefreshKey((k) => k + 1)}
         />
       )}
     </>
