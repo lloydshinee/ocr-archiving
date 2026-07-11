@@ -151,11 +151,11 @@ export async function PATCH(
     }
 
     if ((isDean || profile.role === "program_head") && categoryId !== undefined) {
-      updateData.category_id = categoryId
+      updateData.category_id = categoryId || null
     }
 
     if ((isDean || profile.role === "program_head") && documentTypeId !== undefined) {
-      updateData.document_type_id = documentTypeId
+      updateData.document_type_id = documentTypeId || null
     }
 
     if (tagsStr !== undefined) {

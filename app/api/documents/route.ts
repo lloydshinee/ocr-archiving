@@ -199,6 +199,29 @@ export async function POST(request: Request) {
       details: { file_name: file.name, file_size: file.size },
     })
 
+    const { data: usersWithView } = await adminClient
+      .from("permissions")
+      .select("user_id")
+      .eq("folder_id", folderId)
+      .contains("actions", ["view"])
+
+    if (usersWithView) {
+      const notified = new Set<string>()
+      for (const p of usersWithView) {
+        if (p.user_id !== user.id && !notified.has(p.user_id)) {
+          notified.add(p.user_id)
+          await adminClient.from("notifications").insert({
+            user_id: p.user_id,
+            type: "document",
+            title: "New document uploaded",
+            body: `"${docTitle}" was uploaded to a folder you can access`,
+            resource_type: "document",
+            resource_id: doc.id,
+          })
+        }
+      }
+    }
+
     return NextResponse.json({ document: doc }, { status: 201 })
   } catch {
     return NextResponse.json(

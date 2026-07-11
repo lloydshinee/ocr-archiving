@@ -74,6 +74,15 @@ export async function PATCH(
       details: { target_user_id: perm.user_id, previous: current, updated, assign },
     })
 
+    await adminClient.from("notifications").insert({
+      user_id: perm.user_id,
+      type: "permission",
+      title: "Permissions updated",
+      body: `Your permissions on a ${perm.folder_id ? "folder" : "document"} were modified`,
+      resource_type: perm.folder_id ? "folder" : "document",
+      resource_id: perm.folder_id ?? perm.document_id,
+    })
+
     return NextResponse.json({ permission: result })
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
@@ -129,6 +138,15 @@ export async function DELETE(
       resource_type: perm.folder_id ? "folder" : "document",
       resource_id: perm.folder_id ?? perm.document_id,
       details: { target_user_id: perm.user_id, revoked_actions: perm.actions },
+    })
+
+    await adminClient.from("notifications").insert({
+      user_id: perm.user_id,
+      type: "permission",
+      title: "Permissions revoked",
+      body: `Your permissions on a ${perm.folder_id ? "folder" : "document"} were revoked`,
+      resource_type: perm.folder_id ? "folder" : "document",
+      resource_id: perm.folder_id ?? perm.document_id,
     })
 
     return NextResponse.json({ success: true })

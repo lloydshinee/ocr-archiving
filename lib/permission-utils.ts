@@ -39,8 +39,10 @@ export async function hasFolderAction(
 
   if (folder.owner_id === userId) return true
 
-  if (profile.role === "program_head" && folder.program_id === profile.program_id) {
-    return true
+  if (profile.role === "program_head") {
+    if (folder.program_id === profile.program_id || folder.program_id === null) {
+      return true
+    }
   }
 
   const resolvedFolderId = await resolvePermissionFolder(folderId)
@@ -97,6 +99,7 @@ export async function resolvePermissionFolder(
 ): Promise<string> {
   const adminClient = createAdminClient()
 
+  let resolved = folderId
   let currentId: string | null = folderId
 
   while (currentId) {
@@ -106,7 +109,9 @@ export async function resolvePermissionFolder(
       .eq("id", currentId)
       .single()
 
-    if (!folder) return folderId
+    if (!folder) return resolved
+
+    resolved = folder.id
 
     if (!folder.inherit_permissions) {
       return folder.id
@@ -115,7 +120,7 @@ export async function resolvePermissionFolder(
     currentId = folder.parent_id ?? null
   }
 
-  return folderId
+  return resolved
 }
 
 export async function isFolderLocked(folderId: string): Promise<boolean> {

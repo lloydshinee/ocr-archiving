@@ -1,22 +1,22 @@
 const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }> = {
   pending: {
-    bg: "bg-amber-50 dark:bg-amber-950/30",
-    text: "text-amber-700 dark:text-amber-400",
+    bg: "bg-amber-200 dark:bg-amber-900/50",
+    text: "text-amber-800 dark:text-amber-300",
     label: "OCR pending",
   },
   processing: {
-    bg: "bg-sky-50 dark:bg-sky-950/30",
-    text: "text-sky-700 dark:text-sky-400",
+    bg: "bg-sky-200 dark:bg-sky-900/50",
+    text: "text-sky-800 dark:text-sky-300",
     label: "OCR processing",
   },
   completed: {
-    bg: "bg-transparent",
-    text: "text-muted-foreground/50",
+    bg: "bg-muted/30",
+    text: "text-muted-foreground",
     label: "OCR complete",
   },
   failed: {
-    bg: "bg-destructive/10",
-    text: "text-destructive",
+    bg: "bg-destructive/15",
+    text: "text-destructive font-medium",
     label: "OCR failed",
   },
 }

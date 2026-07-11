@@ -15,6 +15,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarMenuSkeleton,
+  useSidebar,
 } from "@/components/ui/sidebar"
 import {
   Dialog,
@@ -36,8 +37,9 @@ import { toast } from "sonner"
 type FolderRow = Database["public"]["Tables"]["folders"]["Row"]
 type ProgramRow = Database["public"]["Tables"]["programs"]["Row"]
 
-export function AppSidebar() {
+export function AppSidebar({ userRole }: { userRole?: string | null }) {
   const router = useRouter()
+  const { setOpenMobile } = useSidebar()
   const [folders, setFolders] = useState<FolderRow[]>([])
   const [programs, setPrograms] = useState<ProgramRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -81,8 +83,26 @@ export function AppSidebar() {
 
   const programMap = new Map(programs.map((p) => [p.id, p.name]))
 
+  const collegeWideIds = new Set<string>()
+
+  function collectCollegeWideDescendants(parentId: string) {
+    for (const f of folders) {
+      if (f.parent_id === parentId && f.program_id === null) {
+        collegeWideIds.add(f.id)
+        collectCollegeWideDescendants(f.id)
+      }
+    }
+  }
+
+  for (const f of folders) {
+    if (f.parent_id === null && f.program_id === null) {
+      collegeWideIds.add(f.id)
+      collectCollegeWideDescendants(f.id)
+    }
+  }
+
   const collegeWideRoots = buildFolderTree(
-    folders.filter((f) => f.parent_id === null && f.program_id === null),
+    folders.filter((f) => collegeWideIds.has(f.id)),
   )
 
   const programRoots = new Map<string, FolderRow[]>()
@@ -121,6 +141,21 @@ export function AppSidebar() {
     })
   }
 
+  const coveredIds = new Set<string>()
+  function collectIds(nodes: FolderTreeNode[]) {
+    for (const n of nodes) {
+      coveredIds.add(n.id)
+      collectIds(n.children)
+    }
+  }
+  collectIds(collegeWideRoots)
+  for (const { tree } of programTrees) {
+    collectIds(tree)
+  }
+
+  const orphanedFolders = folders.filter((f) => !coveredIds.has(f.id))
+  const permittedTree = buildFolderTree(orphanedFolders)
+
   const handleCreateFolder = async (e: React.FormEvent) => {
     e.preventDefault()
     setNewFolderError(null)
@@ -156,6 +191,8 @@ export function AppSidebar() {
     }
   }
 
+  const canCreateTopLevel = userRole === "dean" || userRole === "program_head"
+
   return (
     <Sidebar
         collapsible="icon"
@@ -168,7 +205,7 @@ export function AppSidebar() {
               <SidebarMenuButton
                 size="lg"
                 tooltip="CCS Archive"
-                onClick={() => router.push("/dashboard")}
+                onClick={() => { router.push("/dashboard"); setOpenMobile(false) }}
               >
                 <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
                   <FolderIcon className="size-4" />
@@ -231,7 +268,7 @@ export function AppSidebar() {
                   >
                     No folders to show
                   </p>
-                  <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                  {canCreateTopLevel && <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                     <DialogTrigger
                       render={
                         <button className="rounded-md border border-sidebar-border px-3 py-1 text-xs text-sidebar-foreground/70 hover:bg-sidebar-accent transition-colors">
@@ -285,16 +322,16 @@ export function AppSidebar() {
                         </fieldset>
                       </form>
                     </DialogContent>
-                  </Dialog>
-                </div>
+                  </Dialog>}
+                  </div>
               </SidebarGroupContent>
             </SidebarGroup>
           ) : (
             <>
-              {collegeWideRoots.length > 0 ? (
+              {collegeWideRoots.length > 0 && (
                 <SidebarGroup>
                   <SidebarGroupLabel>College-Wide</SidebarGroupLabel>
-                  <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                  {canCreateTopLevel && <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                     <DialogTrigger
                       render={
                         <SidebarGroupAction title="New college-wide folder">
@@ -348,37 +385,35 @@ export function AppSidebar() {
                         </fieldset>
                       </form>
                     </DialogContent>
-                  </Dialog>
+                  </Dialog>}
                   <SidebarGroupContent>
                     <FolderTree roots={collegeWideRoots} />
                   </SidebarGroupContent>
                 </SidebarGroup>
-              ) : (
+              )}
+
+              {programTrees.length > 0 && (
                 <SidebarGroup>
-                  <SidebarGroupLabel>College-Wide</SidebarGroupLabel>
+                  <SidebarGroupLabel>Programs</SidebarGroupLabel>
                   <SidebarGroupContent>
-                    <div className="flex flex-col items-center gap-2 px-3 py-4">
-                      <FileTextIcon className="size-5 text-sidebar-foreground/25" />
-                      <p
-                        className="text-[11px] uppercase tracking-[0.12em] text-sidebar-foreground/40 group-data-[collapsible=icon]:hidden"
-                        style={{ fontFamily: "var(--font-mono)" }}
-                      >
-                        No folders yet
-                      </p>
-                    </div>
+                    {programTrees.map(({ programId, tree }) =>
+                      tree.length > 0 ? (
+                        <div key={programId}>
+                          <FolderTree roots={tree} />
+                        </div>
+                      ) : null,
+                    )}
                   </SidebarGroupContent>
                 </SidebarGroup>
               )}
 
-              {programTrees.map(({ programId, programName, tree }) =>
-                tree.length > 0 ? (
-                  <SidebarGroup key={programId}>
-                    <SidebarGroupLabel>{programName}</SidebarGroupLabel>
-                    <SidebarGroupContent>
-                      <FolderTree roots={tree} />
-                    </SidebarGroupContent>
-                  </SidebarGroup>
-                ) : null,
+              {permittedTree.length > 0 && (
+                <SidebarGroup>
+                  <SidebarGroupLabel>Permitted</SidebarGroupLabel>
+                  <SidebarGroupContent>
+                    <FolderTree roots={permittedTree} />
+                  </SidebarGroupContent>
+                </SidebarGroup>
               )}
             </>
           )}

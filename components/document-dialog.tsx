@@ -32,6 +32,7 @@ interface DocumentDialogProps {
   folderName: string
   document?: ExistingDocument
   trigger?: React.ReactElement
+  disabled?: boolean
 }
 
 export function DocumentDialog({
@@ -40,6 +41,7 @@ export function DocumentDialog({
   folderName,
   document,
   trigger,
+  disabled,
 }: DocumentDialogProps) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -149,11 +151,11 @@ export function DocumentDialog({
           }
         }
 
-        const body: Record<string, string> = {}
+        const body: Record<string, string | null> = {}
         if (title.trim()) body.title = title.trim()
         body.description = description.trim()
-        if (categoryId) body.categoryId = categoryId
-        if (documentTypeId) body.documentTypeId = documentTypeId
+        body.categoryId = categoryId || null
+        body.documentTypeId = documentTypeId || null
         body.tags = tags.trim()
 
         const res = await fetch(`/api/documents/${document!.id}`, {
@@ -252,7 +254,7 @@ export function DocumentDialog({
       ) : (
         <DialogTrigger
           render={
-            <Button size="sm" type="button">
+            <Button size="sm" type="button" disabled={disabled}>
               {isEdit ? (
                 <><PencilIcon className="size-4" /> Edit</>
               ) : (
@@ -262,7 +264,7 @@ export function DocumentDialog({
           }
         />
       )}
-      <DialogContent className="sm:max-w-3xl">
+      <DialogContent className="sm:max-w-3xl px-3 sm:px-4">
         <DialogHeader>
           <DialogTitle>
             {isEdit ? "Edit document" : "Upload document"}
@@ -275,7 +277,7 @@ export function DocumentDialog({
           {isEdit ? `Editing "${document?.title}"` : `to ${folderName}`}
         </p>
         <form onSubmit={handleSubmit}>
-          <fieldset disabled={loading} className="flex flex-col gap-4">
+          <fieldset disabled={loading} className="flex flex-col gap-3 sm:gap-4">
             <div className="flex flex-col gap-2">
               <Label
                 htmlFor="file"
@@ -290,7 +292,7 @@ export function DocumentDialog({
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onClick={() => fileInputRef.current?.click()}
-                className={`relative flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-8 transition-colors ${
+                className={`relative flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-4 sm:p-8 transition-colors ${
                   dragOver
                     ? "border-primary bg-primary/5"
                     : file
@@ -356,46 +358,23 @@ export function DocumentDialog({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-2">
-                <Label
-                  htmlFor="title"
-                  className="text-xs uppercase tracking-[0.12em] text-muted-foreground"
-                  style={{ fontFamily: "var(--font-mono)" }}
-                >
-                  Title
-                </Label>
-                <Input
-                  id="title"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Document title"
-                />
-              </div>
+            <div className="flex flex-col gap-2">
+              <Label
+                htmlFor="title"
+                className="text-xs uppercase tracking-[0.12em] text-muted-foreground"
+                style={{ fontFamily: "var(--font-mono)" }}
+              >
+                Title
+              </Label>
+              <Input
+                id="title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Document title"
+              />
+            </div>
 
-              <div className="flex flex-col gap-2">
-                <Label
-                  htmlFor="category"
-                  className="text-xs uppercase tracking-[0.12em] text-muted-foreground"
-                  style={{ fontFamily: "var(--font-mono)" }}
-                >
-                  Category
-                </Label>
-                <select
-                  id="category"
-                  value={categoryId}
-                  onChange={(e) => setCategoryId(e.target.value)}
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                >
-                  <option value="">None</option>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
+            <div className="grid grid-cols-2 gap-3 sm:gap-4">
               <div className="flex flex-col gap-2">
                 <Label
                   htmlFor="docType"
@@ -421,22 +400,45 @@ export function DocumentDialog({
 
               <div className="flex flex-col gap-2">
                 <Label
-                  htmlFor="tags"
+                  htmlFor="category"
                   className="text-xs uppercase tracking-[0.12em] text-muted-foreground"
                   style={{ fontFamily: "var(--font-mono)" }}
                 >
-                  Tags
+                  Category
                 </Label>
-                <Input
-                  id="tags"
-                  value={tags}
-                  onChange={(e) => setTags(e.target.value)}
-                  placeholder="e.g. handbook, 2026, policy"
-                />
-                <p className="text-[11px] text-muted-foreground/50">
-                  Comma-separated
-                </p>
+                <select
+                  id="category"
+                  value={categoryId}
+                  onChange={(e) => setCategoryId(e.target.value)}
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                >
+                  <option value="">None</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
               </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label
+                htmlFor="tags"
+                className="text-xs uppercase tracking-[0.12em] text-muted-foreground"
+                style={{ fontFamily: "var(--font-mono)" }}
+              >
+                Tags
+              </Label>
+              <Input
+                id="tags"
+                value={tags}
+                onChange={(e) => setTags(e.target.value)}
+                placeholder="e.g. handbook, 2026, policy"
+              />
+              <p className="text-[11px] text-muted-foreground/50">
+                Comma-separated
+              </p>
             </div>
 
             <div className="flex flex-col gap-2">

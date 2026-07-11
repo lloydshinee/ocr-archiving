@@ -60,6 +60,17 @@ export async function POST(
       resource_id: id,
     })
 
+    if (updated && updated.owner_id !== user.id) {
+      await adminClient.from("notifications").insert({
+        user_id: updated.owner_id,
+        type: "archive",
+        title: archive ? "Document archived" : "Document unarchived",
+        body: `"${updated.title}" was ${archive ? "archived" : "unarchived"}`,
+        resource_type: "document",
+        resource_id: id,
+      })
+    }
+
     return NextResponse.json({ document: updated })
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })

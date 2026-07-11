@@ -1,10 +1,12 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { toast } from "sonner"
-import { Trash2Icon, RotateCcwIcon, FolderIcon, FileIcon, AlertTriangleIcon } from "lucide-react"
+import { SearchIcon, Trash2Icon, RotateCcwIcon, FolderIcon, AlertTriangleIcon } from "lucide-react"
+import { fileTypeIcon } from "@/lib/file-icons"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { ConfirmDialog } from "@/components/confirm-dialog"
 
 interface BinItem {
   id: string
@@ -23,8 +25,20 @@ interface BinItem {
 export function RecycleBin({ isDean }: { isDean: boolean }) {
   const [items, setItems] = useState<BinItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState("")
   const [restoring, setRestoring] = useState<Set<string>>(new Set())
   const [purging, setPurging] = useState<Set<string>>(new Set())
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return items
+    const q = search.toLowerCase()
+    return items.filter(
+      (item) =>
+        item.name.toLowerCase().includes(q) ||
+        item.deletedBy.toLowerCase().includes(q) ||
+        item.type.toLowerCase().includes(q),
+    )
+  }, [items, search])
 
   async function reloadItems() {
     try {
@@ -72,8 +86,6 @@ export function RecycleBin({ isDean }: { isDean: boolean }) {
   }
 
   const handlePurge = async (item: BinItem) => {
-    if (!confirm(`Permanently delete "${item.name}"? This cannot be undone.`)) return
-
     setPurging((prev) => new Set(prev).add(item.id))
     try {
       const endpoint = item.type === "folder"
@@ -126,22 +138,47 @@ export function RecycleBin({ isDean }: { isDean: boolean }) {
     )
   }
 
+  const showEmptySearch = search.trim() && filtered.length === 0
+
   return (
-    <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
-      <div className="divide-y">
-        {items.map((item) => {
+    <div className="flex flex-col gap-4">
+      <div className="relative">
+        <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by name, type, or who deleted it..."
+          className="w-full rounded-lg border bg-background pl-9 pr-3 py-2 text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
+        />
+      </div>
+
+      {showEmptySearch ? (
+        <div className="flex flex-col items-center gap-3 py-16 rounded-xl border bg-card shadow-sm">
+          <SearchIcon className="size-8 text-muted-foreground/25" />
+          <p
+            className="text-xs text-muted-foreground/60"
+            style={{ fontFamily: "var(--font-mono)" }}
+          >
+            No results match your search
+          </p>
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
+          <div className="divide-y">
+        {filtered.map((item) => {
           const isExpired = item.daysRemaining <= 0
 
           return (
             <div
               key={item.id}
-              className="flex items-center justify-between gap-4 px-5 py-3.5 hover:bg-muted/50 transition-colors"
+              className="flex flex-wrap items-center justify-between gap-4 px-5 py-3.5 hover:bg-muted/50 transition-colors"
             >
               <div className="flex items-center gap-3 min-w-0 flex-1">
                 {item.type === "folder" ? (
                   <FolderIcon className="size-4 shrink-0 text-primary" />
                 ) : (
-                  <FileIcon className="size-4 shrink-0 text-muted-foreground" />
+                  fileTypeIcon(item.fileType ?? "")
                 )}
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
@@ -199,22 +236,33 @@ export function RecycleBin({ isDean }: { isDean: boolean }) {
                   {restoring.has(item.id) ? "..." : "Restore"}
                 </Button>
                 {isDean && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handlePurge(item)}
-                    disabled={purging.has(item.id)}
-                    className="gap-1 border-destructive/30 text-destructive hover:bg-destructive/10"
-                  >
-                    <Trash2Icon className="size-3" />
-                    {purging.has(item.id) ? "..." : "Purge"}
-                  </Button>
+                  <ConfirmDialog
+                    title="Permanently delete?"
+                    description={`Permanently delete "${item.name}"? This cannot be undone.`}
+                    confirmLabel="Purge"
+                    destructive
+                    onConfirm={() => handlePurge(item)}
+                    loading={purging.has(item.id)}
+                    trigger={
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={purging.has(item.id)}
+                        className="gap-1 border-destructive/30 text-destructive hover:bg-destructive/10"
+                      >
+                        <Trash2Icon className="size-3" />
+                        {purging.has(item.id) ? "..." : "Purge"}
+                      </Button>
+                    }
+                  />
                 )}
               </div>
             </div>
           )
         })}
       </div>
+    </div>
+      )}
     </div>
   )
 }

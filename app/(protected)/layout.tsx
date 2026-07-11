@@ -2,6 +2,8 @@ import { Separator } from "@/components/ui/separator"
 import { createClient } from "@/lib/supabase/server"
 import { SignoutButton } from "@/components/signout-button"
 import { AppSidebar } from "@/components/app-sidebar"
+import { NotificationBell } from "@/components/notification-bell"
+import { AdminMenu } from "@/components/admin-menu"
 import {
   SidebarProvider,
   SidebarTrigger,
@@ -30,7 +32,7 @@ export default async function ProtectedLayout({
 
   return (
     <SidebarProvider>
-      <AppSidebar />
+      <AppSidebar userRole={profile?.role ?? null} />
       <SidebarInset>
         <header
           className="sticky top-0 z-50 flex h-14 shrink-0 items-center justify-between border-b border-sidebar-border px-6"
@@ -45,9 +47,9 @@ export default async function ProtectedLayout({
             </span>
             <Separator
               orientation="vertical"
-              className="h-4 bg-white/10"
+              className="hidden sm:block h-4 bg-white/10"
             />
-            <nav className="flex items-center gap-1">
+            <nav className="hidden sm:flex items-center gap-1">
               <Link
                 href="/dashboard"
                 className="rounded-md px-2 py-1 text-xs uppercase tracking-[0.15em] text-white/50 transition-colors hover:bg-white/10 hover:text-white/80"
@@ -55,38 +57,7 @@ export default async function ProtectedLayout({
               >
                 Dashboard
               </Link>
-              {showUsersLink && (
-                <>
-                  <Link
-                    href="/dashboard/users"
-                    className="rounded-md px-2 py-1 text-xs uppercase tracking-[0.15em] text-white/50 transition-colors hover:bg-white/10 hover:text-white/80"
-                    style={{ fontFamily: "var(--font-mono)" }}
-                  >
-                    Users
-                  </Link>
-                  <Link
-                    href="/dashboard/categories"
-                    className="rounded-md px-2 py-1 text-xs uppercase tracking-[0.15em] text-white/50 transition-colors hover:bg-white/10 hover:text-white/80"
-                    style={{ fontFamily: "var(--font-mono)" }}
-                  >
-                    Classification
-                  </Link>
-                  <Link
-                    href="/dashboard/programs"
-                    className="rounded-md px-2 py-1 text-xs uppercase tracking-[0.15em] text-white/50 transition-colors hover:bg-white/10 hover:text-white/80"
-                    style={{ fontFamily: "var(--font-mono)" }}
-                  >
-                    Programs
-                  </Link>
-                  <Link
-                    href="/dashboard/permissions"
-                    className="rounded-md px-2 py-1 text-xs uppercase tracking-[0.15em] text-white/50 transition-colors hover:bg-white/10 hover:text-white/80"
-                    style={{ fontFamily: "var(--font-mono)" }}
-                  >
-                    Permissions
-                  </Link>
-                </>
-              )}
+              {showUsersLink && <AdminMenu />}
               <Link
                 href="/dashboard/recycle-bin"
                 className="rounded-md px-2 py-1 text-xs uppercase tracking-[0.15em] text-white/50 transition-colors hover:bg-white/10 hover:text-white/80"
@@ -97,7 +68,14 @@ export default async function ProtectedLayout({
             </nav>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <a
+              href="/dashboard/search"
+              className="flex sm:hidden items-center justify-center size-8 rounded-md text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+              aria-label="Search"
+            >
+              <SearchIcon className="size-4" />
+            </a>
             <form
               action="/dashboard/search"
               method="GET"
@@ -113,6 +91,7 @@ export default async function ProtectedLayout({
                 />
               </div>
             </form>
+            <NotificationBell />
             {profile && (
               <div className="hidden items-center gap-2 text-sm text-white/75 md:flex">
                 <span className="truncate max-w-[120px]">

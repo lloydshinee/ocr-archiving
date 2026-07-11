@@ -18,9 +18,11 @@ import { toast } from "sonner"
 export function CreateSubfolderDialog({
   parentId,
   parentName,
+  disabled,
 }: {
   parentId: string
   parentName: string
+  disabled?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const [name, setName] = useState("")
@@ -67,7 +69,7 @@ export function CreateSubfolderDialog({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
         render={
-          <Button size="sm" type="button">
+          <Button size="sm" type="button" disabled={disabled}>
             <PlusIcon className="size-4" /> New folder
           </Button>
         }

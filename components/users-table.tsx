@@ -13,8 +13,9 @@ import {
 } from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
 import { CreateUserDialog } from "@/components/create-user-dialog"
+import { EditUserDialog } from "@/components/edit-user-dialog"
 import { type UserRole } from "@/lib/user-utils"
-import { Loader2Icon, PlusIcon, UserXIcon, UserCheckIcon, UsersIcon } from "lucide-react"
+import { Loader2Icon, PlusIcon, PencilIcon, UserXIcon, UserCheckIcon, UsersIcon } from "lucide-react"
 
 interface UserData {
   id: string
@@ -85,6 +86,8 @@ export function UsersTable({
   const [error, setError] = useState<string | null>(null)
   const [togglingId, setTogglingId] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [editingUser, setEditingUser] = useState<UserData | null>(null)
 
   const programMap = new Map(programs.map((p) => [p.id, p.name]))
 
@@ -267,35 +270,52 @@ export function UsersTable({
                     </span>
                   </TableCell>
                   <TableCell>
-                    {currentUserRole === "dean" && u.id !== currentUserId && (
-                      <Button
-                        variant={u.is_deactivated ? "outline" : "secondary"}
-                        size="icon-sm"
-                        disabled={togglingId === u.id}
-                        onClick={() => toggleDeactivation(u)}
-                        aria-label={
-                          u.is_deactivated
-                            ? "Reactivate user"
-                            : "Deactivate user"
-                        }
-                      >
-                        {togglingId === u.id ? (
-                          <Loader2Icon className="h-3.5 w-3.5 animate-spin" />
-                        ) : u.is_deactivated ? (
-                          <UserCheckIcon className="h-3.5 w-3.5" />
-                        ) : (
-                          <UserXIcon className="h-3.5 w-3.5" />
-                        )}
-                      </Button>
-                    )}
-                    {currentUserRole !== "dean" && (
-                      <span
-                        className="text-[10px] text-muted-foreground/50"
-                        style={{ fontFamily: "var(--font-mono)" }}
-                      >
-                        {u.is_deactivated ? "Deactivated" : "Active"}
-                      </span>
-                    )}
+                    <div className="flex items-center gap-1">
+                      {currentUserRole === "dean" && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => {
+                              setEditingUser(u)
+                              setEditDialogOpen(true)
+                            }}
+                            aria-label="Edit user"
+                          >
+                            <PencilIcon className="h-3.5 w-3.5" />
+                          </Button>
+                          {u.id !== currentUserId && (
+                            <Button
+                              variant={u.is_deactivated ? "outline" : "secondary"}
+                              size="icon-sm"
+                              disabled={togglingId === u.id}
+                              onClick={() => toggleDeactivation(u)}
+                              aria-label={
+                                u.is_deactivated
+                                  ? "Reactivate user"
+                                  : "Deactivate user"
+                              }
+                            >
+                              {togglingId === u.id ? (
+                                <Loader2Icon className="h-3.5 w-3.5 animate-spin" />
+                              ) : u.is_deactivated ? (
+                                <UserCheckIcon className="h-3.5 w-3.5" />
+                              ) : (
+                                <UserXIcon className="h-3.5 w-3.5" />
+                              )}
+                            </Button>
+                          )}
+                        </>
+                      )}
+                      {currentUserRole !== "dean" && (
+                        <span
+                          className="text-[10px] text-muted-foreground/50"
+                          style={{ fontFamily: "var(--font-mono)" }}
+                        >
+                          {u.is_deactivated ? "Deactivated" : "Active"}
+                        </span>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -312,6 +332,19 @@ export function UsersTable({
         programs={programs}
         onCreated={loadUsers}
       />
+
+      {editingUser && (
+        <EditUserDialog
+          open={editDialogOpen}
+          onOpenChange={(o) => {
+            setEditDialogOpen(o)
+            if (!o) setEditingUser(null)
+          }}
+          user={editingUser}
+          programs={programs}
+          onUpdated={loadUsers}
+        />
+      )}
     </>
   )
 }

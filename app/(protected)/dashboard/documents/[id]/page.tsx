@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/admin-client";
 import { FolderBreadcrumb } from "@/components/folder-breadcrumb";
 import { DocumentDialog } from "@/components/document-dialog";
+import { CommentPanel } from "@/components/comment-panel";
 import { notFound } from "next/navigation";
 import { ViewButton } from "./view-button";
 import {
@@ -13,7 +14,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { DocumentActions } from "./document-actions";
 import { VersionActions } from "@/components/version-actions";
-import { hasDocumentAction } from "@/lib/permission-utils";
+import { hasDocumentAction, getUserProfile, isFolderLocked } from "@/lib/permission-utils";
 import { OcrStatusBadge } from "@/components/ocr-status-badge";
 import { isOcrEligible } from "@/lib/search-utils";
 
@@ -29,6 +30,8 @@ export default async function DocumentPage({
   } = await supabase.auth.getUser();
   if (!user) notFound();
 
+  const profile = await getUserProfile(user.id);
+
   const adminClient = createAdminClient();
 
   const { data: doc } = await adminClient
@@ -39,6 +42,8 @@ export default async function DocumentPage({
     .single();
 
   if (!doc) notFound();
+
+  const isLocked = doc.folder_id ? await isFolderLocked(doc.folder_id) : false;
 
   const categoryPromise = doc.category_id
     ? adminClient
@@ -93,6 +98,7 @@ export default async function DocumentPage({
   const currentVersion = versions?.find((v) => v.id === doc.current_version_id);
 
   const breadcrumbs = await getFolderPath(doc.folder_id);
+  breadcrumbs.push({ id: doc.id, name: doc.title });
 
   return (
     <div className="flex flex-col gap-6">
@@ -164,7 +170,7 @@ export default async function DocumentPage({
           </span>
           {doc.is_archived && (
             <span
-              className="px-2 py-0.5 rounded text-[10px] uppercase tracking-[0.12em] bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+              className="px-2 py-0.5 rounded text-[10px] uppercase tracking-[0.12em] bg-amber-200 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300"
               style={{ fontFamily: "var(--font-mono)" }}
             >
               Archived
@@ -208,23 +214,27 @@ export default async function DocumentPage({
             ?.version_number ?? "?"}
           )
         </a>
-        <DocumentDialog
-          mode="edit"
-          folderId={doc.folder_id ?? ""}
-          folderName=""
-          document={{
-            id: doc.id,
-            title: doc.title,
-            description: doc.description,
-            category_id: doc.category_id,
-            document_type_id: doc.document_type_id,
-            tags,
-          }}
-        />
+        {await hasDocumentAction(user.id, doc.id, "edit") && (
+          <DocumentDialog
+            mode="edit"
+            folderId={doc.folder_id ?? ""}
+            folderName=""
+            disabled={isLocked}
+            document={{
+              id: doc.id,
+              title: doc.title,
+              description: doc.description,
+              category_id: doc.category_id,
+              document_type_id: doc.document_type_id,
+              tags,
+            }}
+          />
+        )}
         <DocumentActions
           documentId={doc.id}
           documentTitle={doc.title}
           isArchived={doc.is_archived ?? false}
+          isLocked={isLocked}
           canArchive={await hasDocumentAction(user.id, doc.id, "archive")}
           canDelete={await hasDocumentAction(user.id, doc.id, "delete")}
         />
@@ -246,7 +256,7 @@ export default async function DocumentPage({
               {versions.map((v) => (
                 <div
                   key={v.id}
-                  className="flex items-center justify-between gap-4 px-5 py-3"
+                  className="flex flex-wrap items-center justify-between gap-4 px-5 py-3"
                 >
                   <div className="flex items-center gap-3 min-w-0 flex-1">
                     <span
@@ -296,6 +306,12 @@ export default async function DocumentPage({
           </div>
         </div>
       )}
+
+      <CommentPanel
+        documentId={doc.id}
+        currentUserId={user.id}
+        currentUserRole={profile?.role ?? "faculty"}
+      />
     </div>
   );
 }

@@ -20,6 +20,7 @@ import {
   ArrowRight,
   ShieldCheck,
 } from "lucide-react";
+import { MobileNav } from "@/components/mobile-nav";
 
 const INK = "var(--brand-ink, oklch(0.18 0.03 160))";
 const INK2 = "var(--brand-ink-2, oklch(0.22 0.03 160))";
@@ -88,7 +89,7 @@ const FEATURES = [
 
 const TICKER = [
   "R. Santos uploaded Level II Survey 2026.pdf to BSCS / Accreditation",
-  "Dean archived Curriculum Draft v3 in BLIS / Curriculum",
+  "Dean archived Curriculum Draft v3 in BSCS / Curriculum",
   "M. Cruz restored version 4 of Faculty Handbook.docx",
   "Program Head granted Edit to J. Reyes on BSIT / Faculty Records",
   "A. Del Rosario commented on Minutes — May 2026.pdf",
@@ -133,6 +134,7 @@ export default function Page() {
               Audit trail
             </a>
           </nav>
+          <MobileNav />
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"
@@ -485,7 +487,7 @@ export default function Page() {
             CCS Archiving System
           </span>
           <span style={{ fontFamily: "var(--font-mono)" }}>
-            BSCS · BSIT · BLIS
+            BSCS · BSIT
           </span>
         </div>
       </footer>

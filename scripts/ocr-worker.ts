@@ -118,6 +118,53 @@ function runDocxExtraction(docxPath: string): Promise<string> {
   })
 }
 
+function runDocxImageOcr(docxPath: string): Promise<string> {
+  const pythonScript = join(tmpdir(), `ocr-docx-img-${randomUUID()}.py`)
+  const script = [
+    "import zipfile, subprocess, sys, tempfile, os, glob",
+    "IMG_EXTS = {'.png', '.jpg', '.jpeg', '.tif', '.tiff', '.bmp', '.gif'}",
+    "docx = sys.argv[1]",
+    "tmp = tempfile.mkdtemp()",
+    "try:",
+    "    with zipfile.ZipFile(docx) as z:",
+    "        media_files = [f for f in z.namelist()",
+    "                       if f.startswith('word/media/')",
+    "                       and os.path.splitext(f)[1].lower() in IMG_EXTS]",
+    "        if not media_files:",
+    "            raise Exception('No images found in word/media/')",
+    "        for mf in media_files:",
+    "            z.extract(mf, tmp)",
+    "    ocr_parts = []",
+    "    exts = ('*.png', '*.jpg', '*.jpeg', '*.tif', '*.tiff', '*.bmp', '*.gif')",
+    "    images = []",
+    "    for ext in exts:",
+    "        images.extend(glob.glob(os.path.join(tmp, 'word', 'media', ext)))",
+    "    images.sort()",
+    "    for img in images:",
+    "        result = subprocess.run(['tesseract', img, 'stdout'],",
+    "                               capture_output=True, text=True, timeout=120)",
+    "        ocr_parts.append(result.stdout)",
+    "    print(''.join(ocr_parts).strip())",
+    "finally:",
+    "    subprocess.run(['rm', '-rf', tmp], capture_output=True)",
+  ].join("\n")
+
+  return new Promise((resolve, reject) => {
+    writeFile(pythonScript, script)
+      .then(() => {
+        exec(`python3 "${pythonScript}" "${docxPath}"`, { timeout: 300000, maxBuffer: 50 * 1024 * 1024 }, (error, stdout) => {
+          unlink(pythonScript).catch(() => {})
+          if (error) {
+            reject(new Error(`DOCX image OCR failed: ${error.message}`))
+            return
+          }
+          resolve(stdout.trim())
+        })
+      })
+      .catch((err) => reject(new Error(`Failed to write Python script: ${err.message}`)))
+  })
+}
+
 function runXlsxExtraction(xlsxPath: string): Promise<string> {
   const pythonScript = join(tmpdir(), `extract-xlsx-${randomUUID()}.py`)
   const script = [
@@ -193,9 +240,14 @@ async function processOcrJob(
     } else if (TXT_TEXT_TYPES.includes(fileType)) {
       ocrText = await runTxtExtraction(tmpPath)
     } else if (OFFICE_TEXT_TYPES.includes(fileType)) {
-      ocrText = fileType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        ? await runDocxExtraction(tmpPath)
-        : await runXlsxExtraction(tmpPath)
+      if (fileType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+        ocrText = await runDocxExtraction(tmpPath)
+        if (!ocrText) {
+          ocrText = await runDocxImageOcr(tmpPath)
+        }
+      } else {
+        ocrText = await runXlsxExtraction(tmpPath)
+      }
     } else {
       throw new Error(`Unsupported file type for OCR: ${fileType}`)
     }

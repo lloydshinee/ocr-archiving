@@ -7,7 +7,7 @@ A document archiving and records management system for the College of Computer S
 ### Organization
 
 **Program**:
-An academic program within the College of Computer Studies (e.g., BSCS, BSIT, BLIS). Each Program has one Program Head and one auto-created root folder. Programs can share document access with other programs.
+An academic program within the College of Computer Studies (e.g., BSCS, BSIT). Each Program has one Program Head and one auto-created root folder. Programs can share document access with other programs.
 _Avoid_: Department, course, major
 
 ### Roles & People
@@ -59,7 +59,7 @@ Moves a folder or document to the Recycle Bin, where it can be restored within 3
 _Avoid_: Remove, trash, soft-delete
 
 **Recycle Bin**:
-A holding area for deleted folders and documents. Items restorable within 30 days. A daily scheduled job permanently deletes expired items and their storage files. The Dean may manually purge items before expiry.
+A holding area for deleted folders and documents. Items restorable within 30 days. The Dean may manually purge individual items before expiry. No automated cleanup job exists yet — expired items must be purged manually by the Dean.
 _Avoid_: Trash, deleted items
 
 ### Metadata
@@ -79,7 +79,7 @@ _Avoid_: Label, keyword, flag
 ### Activity
 
 **Notification**:
-An in-app alert triggered by events relevant to the user: new document in an accessible folder, new comment on a participating thread, permission changes affecting the user, or archival/deletion of owned items. Delivered in real-time via Supabase subscriptions with a bell icon and badge count. No email delivery.
+An in-app alert triggered by events relevant to the user: new document in an accessible folder, new comment on a participating thread, permission changes affecting the user, or archival/deletion of owned items. Delivered in real-time via Supabase Realtime subscriptions (`postgres_changes` on `notifications` table) with a bell icon and badge count. No email delivery.
 _Avoid_: Alert, message, ping
 
 ### Collaboration
@@ -87,6 +87,36 @@ _Avoid_: Alert, message, ping
 **Comment**:
 A discussion message attached to a document. Visible to all users with access to that document. Flat chronological threading (no nested replies). Delivered in real-time on the document view page.
 _Avoid_: Note, remark, annotation
+
+### Storage
+
+**Bucket**:
+A Supabase Storage bucket named `documents`. Files are stored at the path `{documentId}/v{version}-{filename}`. The bucket is private — access is mediated through the API routes (`/api/documents/[id]/view` and `/api/documents/[id]/download`), which check user permissions before serving the file.
+_Avoid_: Blob, S3, file system
+
+### OCR
+
+**Optical Character Recognition (OCR)**:
+A background process that extracts text from uploaded documents to enable full-text search. Runs as a standalone polling worker (`scripts/ocr-worker.ts`) that checks the `ocr_jobs` table every 5 seconds.
+
+Supported file types:
+- **PDF** — pdftoppm → Tesseract
+- **JPEG / PNG** — Tesseract directly
+- **DOCX** (Word) — XML text extraction from `word/document.xml`; if empty (image-only document), extracts images from `word/media/` in the ZIP and OCRs them with Tesseract. No LibreOffice needed.
+- **XLSX** (Excel) — XML text extraction (shared strings + cell values)
+- **PPTX** (PowerPoint) — LibreOffice headless → PDF → pdftoppm → Tesseract (requires LibreOffice)
+- **TXT** — Read as-is
+
+Unsupported: ZIP (stored as-is, no extraction), binary Office formats (.doc, .xls, .ppt).
+
+The worker must be started separately from the web app.
+_Avoid_: Scan, digitize, text extraction
+
+### Viewer
+
+**Document Viewer**:
+An inline overlay for viewing PDFs (iframe), images (native `<img>`), and text files (plain-text `<pre>`). All other file types show a download prompt. Opened via the "View" button on document pages and version history entries.
+_Avoid_: Preview, reader
 
 ### Permissions
 

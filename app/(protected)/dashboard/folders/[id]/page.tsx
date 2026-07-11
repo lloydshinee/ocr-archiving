@@ -2,10 +2,12 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/admin-client"
 import { FolderBreadcrumb } from "@/components/folder-breadcrumb"
 import { DocumentDialog } from "@/components/document-dialog"
-import { notFound } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
 import { CreateSubfolderDialog } from "./create-subfolder-dialog"
 import { FolderActions } from "./folder-actions"
-import { hasFolderAction } from "@/lib/permission-utils"
+import { FolderPageTabs } from "./folder-page-tabs"
+import { FolderPermissionsPanel } from "@/components/folder-permissions-panel"
+import { canManagePermissions, hasFolderAction, isFolderLocked } from "@/lib/permission-utils"
 import { FolderContent } from "./folder-content"
 
 export default async function FolderPage({
@@ -24,6 +26,9 @@ export default async function FolderPage({
     .eq("id", user.id)
     .single()
 
+  const canView = await hasFolderAction(user.id, id, "view")
+  if (!canView) redirect("/dashboard/access-denied")
+
   const adminClient = createAdminClient()
 
   const { data: folder } = await adminClient
@@ -39,18 +44,22 @@ export default async function FolderPage({
   const canCreate =
     profile?.role === "dean" ||
     (profile?.role === "program_head" &&
-      profile.program_id === folder.program_id)
+      profile.program_id === folder.program_id) ||
+    await hasFolderAction(user.id, folder.id, "create")
+
+  const canManagePerms = await canManagePermissions(user.id, folder.id)
+  const isLocked = await isFolderLocked(folder.id)
 
   const { data: subfolders } = await adminClient
     .from("folders")
-    .select("id, name, updated_at, owner_id")
+    .select("id, name, updated_at, owner_id, category_id")
     .eq("parent_id", id)
     .is("deleted_at", null)
     .order("name")
 
   const { data: documents } = await adminClient
     .from("documents")
-    .select("id, title, file_type, owner_id, created_at, current_version_id")
+    .select("id, title, file_type, owner_id, created_at, current_version_id, category_id")
     .eq("folder_id", id)
     .is("deleted_at", null)
     .order("title")
@@ -60,6 +69,40 @@ export default async function FolderPage({
     .select("full_name")
     .eq("id", folder.owner_id)
     .single()
+
+  const folderCategoryName = folder.category_id
+    ? (await adminClient
+        .from("categories")
+        .select("name")
+        .eq("id", folder.category_id)
+        .single()).data?.name ?? null
+    : null
+
+  const subfolderCategoryIds = (subfolders
+    ?.map((sf) => sf.category_id)
+    .filter((id): id is string => id != null) ?? []) as string[]
+  const { data: subfolderCategories } = subfolderCategoryIds.length > 0
+    ? await adminClient
+        .from("categories")
+        .select("id, name")
+        .in("id", subfolderCategoryIds)
+    : { data: [] }
+  const subfolderCategoryNames = new Map(
+    (subfolderCategories ?? []).map((c) => [c.id, c.name]),
+  )
+
+  const docCategoryIds = (documents
+    ?.map((d) => d.category_id)
+    .filter((id): id is string => id != null) ?? []) as string[]
+  const { data: docCategories } = docCategoryIds.length > 0
+    ? await adminClient
+        .from("categories")
+        .select("id, name")
+        .in("id", docCategoryIds)
+    : { data: [] }
+  const docCategoryNames = new Map(
+    (docCategories ?? []).map((c) => [c.id, c.name]),
+  )
 
   const versionCounts = new Map<string, number>()
   if (documents && documents.length > 0) {
@@ -95,7 +138,7 @@ export default async function FolderPage({
     <div className="flex flex-col gap-6">
       <FolderBreadcrumb items={breadcrumbs} />
 
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col md:flex-row items-start justify-between gap-4">
         <div>
           <p
             className="text-xs uppercase tracking-[0.2em] text-muted-foreground"
@@ -116,6 +159,14 @@ export default async function FolderPage({
             >
               Owner: {ownerProfile?.full_name ?? "Unknown"}
             </p>
+            {folderCategoryName && (
+              <span
+                className="text-[11px] text-muted-foreground/50"
+                style={{ fontFamily: "var(--font-mono)" }}
+              >
+                {folderCategoryName}
+              </span>
+            )}
             <span
               className="text-[11px] text-muted-foreground/50"
               style={{ fontFamily: "var(--font-mono)" }}
@@ -132,13 +183,15 @@ export default async function FolderPage({
             <FolderActions
               folderId={folder.id}
               folderName={folder.name}
-              isLocked={folder.is_locked ?? false}
+              isLocked={isLocked}
               isArchived={folder.is_archived ?? false}
               inheritPermissions={folder.inherit_permissions ?? true}
+              hasParent={folder.parent_id != null}
               ownerName={ownerProfile?.full_name ?? "Unknown"}
               userRole={profile?.role ?? ""}
               canArchive={await hasFolderAction(user.id, folder.id, "archive")}
               canDelete={await hasFolderAction(user.id, folder.id, "delete")}
+              canEdit={await hasFolderAction(user.id, folder.id, "edit")}
             />
           </div>
         </div>
@@ -146,20 +199,44 @@ export default async function FolderPage({
         <div className="flex items-center gap-2">
           {canCreate && (
             <>
-              <DocumentDialog mode="upload" folderId={folder.id} folderName={folder.name} />
-              <CreateSubfolderDialog parentId={folder.id} parentName={folder.name} />
+              <DocumentDialog
+                mode="upload"
+                folderId={folder.id}
+                folderName={folder.name}
+                disabled={isLocked}
+              />
+              <CreateSubfolderDialog parentId={folder.id} parentName={folder.name} disabled={isLocked} />
             </>
           )}
         </div>
       </div>
 
-      <FolderContent
-        folderId={folder.id}
-        folderName={folder.name}
-        subfolders={subfolders ?? []}
-        documents={documents ?? []}
-        versionCounts={versionCounts}
-        documentOwners={documentOwners}
+      <FolderPageTabs
+        showPermissionsTab={canManagePerms}
+        contentsTab={
+          <FolderContent
+            folderId={folder.id}
+            folderName={folder.name}
+            subfolders={subfolders ?? []}
+            documents={documents ?? []}
+            versionCounts={versionCounts}
+            documentOwners={documentOwners}
+            subfolderCategoryNames={subfolderCategoryNames}
+            docCategoryNames={docCategoryNames}
+            currentUserId={user.id}
+            userRole={profile?.role ?? ""}
+            folderProgramId={folder.program_id}
+            canArchive={await hasFolderAction(user.id, folder.id, "archive")}
+            canDelete={await hasFolderAction(user.id, folder.id, "delete")}
+            isLocked={isLocked}
+          />
+        }
+        permissionsTab={
+          <FolderPermissionsPanel
+            folderId={folder.id}
+            canManage={canManagePerms}
+          />
+        }
       />
     </div>
   )

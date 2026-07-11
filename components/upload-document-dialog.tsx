@@ -129,7 +129,7 @@ export function UploadDocumentDialog({ folderId, folderName }: UploadDocumentDia
           </Button>
         }
       />
-      <DialogContent className="max-w-md">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Upload document</DialogTitle>
         </DialogHeader>

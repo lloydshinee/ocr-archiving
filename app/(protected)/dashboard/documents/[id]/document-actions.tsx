@@ -4,11 +4,13 @@ import { useState } from "react"
 import { toast } from "sonner"
 import { ArchiveIcon, ArchiveRestoreIcon, Trash2Icon } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { ConfirmDialog } from "@/components/confirm-dialog"
 
 interface DocumentActionsProps {
   documentId: string
   documentTitle: string
   isArchived: boolean
+  isLocked?: boolean
   canArchive: boolean
   canDelete: boolean
 }
@@ -17,6 +19,7 @@ export function DocumentActions({
   documentId,
   documentTitle,
   isArchived: initialArchived,
+  isLocked,
   canArchive,
   canDelete,
 }: DocumentActionsProps) {
@@ -46,8 +49,6 @@ export function DocumentActions({
   }
 
   const handleDelete = async () => {
-    if (!confirm(`Move "${documentTitle}" to the Recycle Bin?`)) return
-
     setLoading(true)
     try {
       const res = await fetch(`/api/documents/${documentId}`, { method: "DELETE" })
@@ -72,7 +73,7 @@ export function DocumentActions({
           variant="outline"
           size="sm"
           onClick={handleArchive}
-          disabled={loading}
+          disabled={loading || isLocked}
           className="gap-1.5"
         >
           {isArchived ? (
@@ -89,17 +90,35 @@ export function DocumentActions({
         </Button>
       )}
 
-      {canDelete && (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleDelete}
-          disabled={loading}
-          className="gap-1.5 border-destructive/30 text-destructive hover:bg-destructive/10"
+      {canDelete && !isLocked && (
+        <ConfirmDialog
+          title="Move to Recycle Bin?"
+          description={`Move "${documentTitle}" to the Recycle Bin? It will be permanently deleted after 30 days.`}
+          confirmLabel="Move to Bin"
+          destructive
+          onConfirm={handleDelete}
+          loading={loading}
+          trigger={
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={loading}
+              className="gap-1.5 border-destructive/30 text-destructive hover:bg-destructive/10"
+            >
+              <Trash2Icon className="size-3.5" />
+              Delete
+            </Button>
+          }
+        />
+      )}
+
+      {isLocked && (
+        <span
+          className="px-2 py-0.5 rounded text-[10px] uppercase tracking-[0.12em] bg-destructive/15 text-destructive font-medium self-center"
+          style={{ fontFamily: "var(--font-mono)" }}
         >
-          <Trash2Icon className="size-3.5" />
-          Delete
-        </Button>
+          Locked
+        </span>
       )}
     </div>
   )

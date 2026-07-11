@@ -49,6 +49,17 @@ export async function POST(
       .eq("id", id)
       .single()
 
+    if (folder && folder.owner_id !== user.id) {
+      await adminClient.from("notifications").insert({
+        user_id: folder.owner_id,
+        type: "archive",
+        title: archive ? "Folder archived" : "Folder unarchived",
+        body: `"${folder.name}" was ${archive ? "archived" : "unarchived"}`,
+        resource_type: "folder",
+        resource_id: id,
+      })
+    }
+
     return NextResponse.json({ folder })
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })

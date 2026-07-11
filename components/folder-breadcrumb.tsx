@@ -10,7 +10,7 @@ export function FolderBreadcrumb({
   items: BreadcrumbItem[]
 }) {
   return (
-    <nav aria-label="Breadcrumb" className="flex items-center gap-1">
+    <nav aria-label="Breadcrumb" className="flex items-center gap-1 min-w-0">
       <Link
         href="/dashboard"
         className="rounded p-1 text-muted-foreground hover:text-foreground transition-colors"
@@ -22,7 +22,7 @@ export function FolderBreadcrumb({
           <ChevronRightIcon className="size-3 text-muted-foreground/40" />
           {i === items.length - 1 ? (
             <span
-              className="text-xs uppercase tracking-[0.15em] text-foreground"
+              className="truncate max-w-[200px] text-xs uppercase tracking-[0.15em] text-foreground"
               style={{ fontFamily: "var(--font-mono)" }}
             >
               {item.name}
@@ -30,7 +30,7 @@ export function FolderBreadcrumb({
           ) : (
             <Link
               href={`/dashboard/folders/${item.id}`}
-              className="text-xs uppercase tracking-[0.15em] text-muted-foreground hover:text-foreground transition-colors rounded px-1 py-0.5"
+              className="truncate max-w-[160px] text-xs uppercase tracking-[0.15em] text-muted-foreground hover:text-foreground transition-colors rounded px-1 py-0.5"
               style={{ fontFamily: "var(--font-mono)" }}
             >
               {item.name}

@@ -1,4 +1,5 @@
-import { SearchIcon, FolderIcon, FileIcon, FilterIcon } from "lucide-react"
+import { SearchIcon, FolderIcon, FilterIcon } from "lucide-react"
+import { fileTypeIcon, fileTypeLabel } from "@/lib/file-icons"
 import { Badge } from "@/components/ui/badge"
 import { createAdminClient } from "@/lib/admin-client"
 import { createClient } from "@/lib/supabase/server"
@@ -212,14 +213,14 @@ function ResultCard({ result }: { result: SearchResultItem }) {
           {isFolder ? (
             <FolderIcon className="size-5 text-muted-foreground" />
           ) : (
-            <FileIcon className="size-5 text-muted-foreground" />
+            <span className="mt-0.5 block">{fileTypeIcon(result.file_type ?? "")}</span>
           )}
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span className="font-medium text-sm truncate">{result.title}</span>
             <Badge variant="outline" className="text-[10px] shrink-0">
-              {isFolder ? "Folder" : "Document"}
+              {isFolder ? "Folder" : fileTypeLabel(result.file_type ?? "")}
             </Badge>
             {!isFolder && result.ocr_status && isOcrEligible(result.file_type) && (
               <OcrStatusBadge status={result.ocr_status} />
@@ -242,11 +243,6 @@ function ResultCard({ result }: { result: SearchResultItem }) {
             )}
             {!result.folder_path && result.folder_id && <span>Root</span>}
             <span>by {result.owner_name}</span>
-            {!isFolder && result.file_type && (
-              <span className="uppercase">
-                {result.file_type.split("/")[1] || result.file_type}
-              </span>
-            )}
             {!isFolder && result.file_size != null && (
               <span>{(result.file_size / 1024 / 1024).toFixed(2)} MB</span>
             )}

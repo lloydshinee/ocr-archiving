@@ -88,6 +88,15 @@ export async function POST(request: Request) {
       details: { target_user_id: userId, actions: validActions },
     })
 
+    await adminClient.from("notifications").insert({
+      user_id: userId,
+      type: "permission",
+      title: "Permissions updated",
+      body: `You were granted ${validActions.join(", ")} access on a ${folderId ? "folder" : "document"}`,
+      resource_type: folderId ? "folder" : "document",
+      resource_id: resourceId,
+    })
+
     return NextResponse.json({ permission: created }, { status: 201 })
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })

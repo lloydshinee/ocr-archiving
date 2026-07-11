@@ -58,7 +58,7 @@ export default function ProgramsPage() {
         emptyIcon={GraduationCapIcon}
         emptyText="No programs yet."
         emptyDescription="Create one to organize folders and users by academic program."
-        createDescription="Add a new academic program (e.g. BSCS, BSIT, BLIS)."
+        createDescription="Add a new academic program (e.g. BSCS, BSIT)."
       />
     </div>
   )

@@ -17,6 +17,7 @@ import {
   SidebarMenuSub,
   SidebarMenuSubItem,
   SidebarMenuSubButton,
+  useSidebar,
 } from "@/components/ui/sidebar"
 import type { FolderTreeNode } from "@/lib/folder-utils"
 
@@ -30,6 +31,7 @@ function FolderTreeItem({
   const [open, setOpen] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
+  const { setOpenMobile } = useSidebar()
   const href = `/dashboard/folders/${folder.id}`
   const isActive = pathname === href
   const hasChildren = folder.children.length > 0
@@ -44,7 +46,7 @@ function FolderTreeItem({
         {isSub ? (
           <SidebarMenuSubButton
             isActive={isActive}
-            onClick={() => router.push(href)}
+            onClick={() => { router.push(href); setOpenMobile(false) }}
             className={cn(isArchived && "opacity-50")}
           >
             <span className={cn("truncate", isArchived && "italic")}>{folder.name}</span>
@@ -61,7 +63,7 @@ function FolderTreeItem({
           <SidebarMenuButton
             isActive={isActive}
             tooltip={folder.name + (isArchived ? " (archived)" : "")}
-            onClick={() => router.push(href)}
+            onClick={() => { router.push(href); setOpenMobile(false) }}
             className={cn(isArchived && "opacity-60")}
           >
             <FolderIcon className="size-4 shrink-0" />
@@ -89,7 +91,7 @@ function FolderTreeItem({
           <div className="flex items-center gap-0 pr-0.5">
             <SidebarMenuSubButton
               isActive={isActive}
-              onClick={() => router.push(href)}
+              onClick={() => { router.push(href); setOpenMobile(false) }}
               className={cn("flex-1", isArchived && "opacity-50")}
             >
               <span className={cn("truncate", isArchived && "italic")}>{folder.name}</span>
@@ -120,7 +122,7 @@ function FolderTreeItem({
             <SidebarMenuButton
               isActive={isActive}
               tooltip={folder.name + (isArchived ? " (archived)" : "")}
-              onClick={() => router.push(href)}
+              onClick={() => { router.push(href); setOpenMobile(false) }}
               className={cn(isArchived && "opacity-60")}
             >
               <FolderIcon className="size-4 shrink-0" />

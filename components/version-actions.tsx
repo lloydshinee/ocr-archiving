@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { EyeIcon, RotateCcwIcon, Trash2Icon } from "lucide-react"
 import { DocumentViewer } from "@/components/document-viewer"
+import { ConfirmDialog } from "@/components/confirm-dialog"
 import { toast } from "sonner"
 
 interface VersionActionsProps {
@@ -53,8 +54,6 @@ export function VersionActions({
   }
 
   const handleDelete = async () => {
-    if (!confirm(`Delete version v${versionNumber} (${fileName})? This cannot be undone.`)) return
-
     setDeleting(true)
     try {
       const res = await fetch(
@@ -118,15 +117,24 @@ export function VersionActions({
             <RotateCcwIcon className={`size-3.5 ${restoring ? "animate-spin" : ""}`} />
           </button>
 
-          <button
-            type="button"
-            onClick={handleDelete}
-            disabled={deleting}
-            className="rounded p-1.5 text-muted-foreground hover:text-destructive transition-colors disabled:opacity-40"
-            title="Delete this version"
-          >
-            <Trash2Icon className={`size-3.5 ${deleting ? "animate-spin" : ""}`} />
-          </button>
+          <ConfirmDialog
+            title="Delete version"
+            description={`Delete version v${versionNumber} (${fileName})? This cannot be undone.`}
+            confirmLabel="Delete"
+            destructive
+            onConfirm={handleDelete}
+            loading={deleting}
+            trigger={
+              <button
+                type="button"
+                disabled={deleting}
+                className="rounded p-1.5 text-muted-foreground hover:text-destructive transition-colors disabled:opacity-40"
+                title="Delete this version"
+              >
+                <Trash2Icon className={`size-3.5 ${deleting ? "animate-spin" : ""}`} />
+              </button>
+            }
+          />
         </>
       )}
 

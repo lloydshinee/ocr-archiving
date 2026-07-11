@@ -54,8 +54,6 @@ export function CreateUserDialog({
     ["dean", "program_head", "faculty", "student_assistant"] as UserRole[]
   ).filter((r) => canCreateRole(creatorRole, r))
 
-  const isProgramHead = creatorRole === "program_head"
-
   function reset() {
     setEmail("")
     setPassword("")
@@ -166,7 +164,7 @@ export function CreateUserDialog({
                   value={role}
                   onValueChange={(v) => {
                     setRole(v as UserRole)
-                    if (v === "dean" || (isProgramHead)) {
+                    if (v !== "program_head") {
                       setProgramId("")
                     }
                   }}
@@ -187,33 +185,28 @@ export function CreateUserDialog({
                   </SelectContent>
                 </Select>
               </Field>
-              <Field>
-                <FieldLabel htmlFor="create-program">Program</FieldLabel>
-                <Select
-                  value={programId || undefined}
-                  onValueChange={(v) => setProgramId(v ?? "")}
-                  disabled={isProgramHead || role === "dean"}
-                >
-                  <SelectTrigger id="create-program">
-                    <SelectValue
-                      placeholder={
-                        isProgramHead
-                          ? "Your program (auto-set)"
-                          : role === "dean"
-                            ? "Optional for Dean"
-                            : "Select a program"
-                      }
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {programs.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
+              {role === "program_head" && (
+                <Field>
+                  <FieldLabel htmlFor="create-program">Program</FieldLabel>
+                  <Select
+                    value={programId || undefined}
+                    onValueChange={(v) => setProgramId(v ?? "")}
+                  >
+                    <SelectTrigger id="create-program">
+                      {programId
+                        ? programs.find((p) => p.id === programId)?.name
+                        : "Select a program"}
+                    </SelectTrigger>
+                    <SelectContent>
+                      {programs.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+              )}
               {error && (
                 <p
                   className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"

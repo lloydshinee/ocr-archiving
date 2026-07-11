@@ -154,18 +154,20 @@ export async function POST(request: Request) {
       )
     }
 
-    const { error: insertError } = await adminClient.from("users").insert({
-      id: authUser.user.id,
-      email,
-      full_name: fullName,
-      role,
-      program_id: targetProgramId,
-      created_by: user.id,
-    })
+    const { error: updateError } = await adminClient
+      .from("users")
+      .update({
+        email,
+        full_name: fullName,
+        role,
+        program_id: targetProgramId,
+        created_by: user.id,
+      })
+      .eq("id", authUser.user.id)
 
-    if (insertError) {
+    if (updateError) {
       return NextResponse.json(
-        { error: "Failed to create user profile." },
+        { error: "Failed to update user profile." },
         { status: 500 },
       )
     }

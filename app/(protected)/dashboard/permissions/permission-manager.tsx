@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useMemo } from "react"
 import { toast } from "sonner"
-import { Trash2Icon, FolderPlusIcon } from "lucide-react"
+import { Trash2Icon, FolderPlusIcon, Loader2Icon, UsersIcon, GraduationCapIcon, UserCogIcon, UserCheckIcon } from "lucide-react"
+import { createClient } from "@/lib/supabase/browser"
 import { Button } from "@/components/ui/button"
 import {
   Select,
@@ -20,14 +21,33 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogMedia,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { FolderCombobox } from "@/components/folder-combobox"
 import { getFolderParentPath } from "@/lib/folder-utils"
 import type { Database } from "@/lib/supabase/database.types"
 
 type FolderRow = Database["public"]["Tables"]["folders"]["Row"]
 
-const ALL_ACTIONS = ["view", "create", "edit", "move", "delete", "archive"] as const
+  const ALL_ACTIONS = ["view", "create", "edit", "move", "delete", "archive"] as const
 type PermAction = (typeof ALL_ACTIONS)[number]
+
+const ROLE_PRESETS: Record<string, PermAction[]> = {
+  faculty: ["view"],
+  student_assistant: ["view", "create", "edit"],
+  program_head: [...ALL_ACTIONS],
+  dean: [...ALL_ACTIONS],
+}
 
 interface UserOption {
   id: string
@@ -51,6 +71,12 @@ interface PermissionEntry {
   assignedDate: string
 }
 
+const ROLE_CONFIG = [
+  { value: "faculty", label: "Faculty", Icon: GraduationCapIcon },
+  { value: "student_assistant", label: "Student Assistants", Icon: UserCheckIcon },
+  { value: "program_head", label: "Program Heads", Icon: UserCogIcon },
+]
+
 export function PermissionManager() {
   const [users, setUsers] = useState<UserOption[]>([])
   const [folders, setFolders] = useState<FolderRow[]>([])
@@ -58,10 +84,59 @@ export function PermissionManager() {
   const [selectedFolder, setSelectedFolder] = useState<string>("")
   const [selectedActions, setSelectedActions] = useState<Set<PermAction>>(new Set())
   const [granting, setGranting] = useState(false)
+  const [bulkProcessingRole, setBulkProcessingRole] = useState<string | null>(null)
+  const [bulkActions, setBulkActions] = useState<Record<string, PermAction[]>>({})
   const [dataLoading, setDataLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [folderPermissions, setFolderPermissions] = useState<PermissionEntry[]>([])
   const [permsLoading, setPermsLoading] = useState(false)
+  const [currentUserRole, setCurrentUserRole] = useState<string>("faculty")
+
+  const userCountByRole = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const u of users) {
+      counts[u.role] = (counts[u.role] ?? 0) + 1
+    }
+    return counts
+  }, [users])
+
+  const grantedCountByRole = useMemo(() => {
+    const counts: Record<string, number> = {}
+    const userIds = new Set(folderPermissions.map((p) => p.userId))
+    for (const u of users) {
+      if (userIds.has(u.id)) {
+        counts[u.role] = (counts[u.role] ?? 0) + 1
+      }
+    }
+    return counts
+  }, [users, folderPermissions])
+
+  const bulkTargetRoles = useMemo(() => {
+    if (currentUserRole === "dean") return ROLE_CONFIG
+    return ROLE_CONFIG.filter((r) => r.value !== "program_head")
+  }, [currentUserRole])
+
+  // Sync bulk actions with what's already granted per role
+  useEffect(() => {
+    const grantedByRole: Record<string, PermAction[]> = {}
+    for (const { value } of bulkTargetRoles) {
+      const roleUserIds = new Set(
+        users.filter((u) => u.role === value).map((u) => u.id),
+      )
+      const actions = new Set<PermAction>()
+      for (const perm of folderPermissions) {
+        if (roleUserIds.has(perm.userId)) {
+          for (const a of perm.actions) {
+            actions.add(a as PermAction)
+          }
+        }
+      }
+      grantedByRole[value] = [...actions]
+    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setBulkActions(grantedByRole)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [folderPermissions, bulkTargetRoles])
 
   const folderOptions: FolderOption[] = useMemo(
     () =>
@@ -77,6 +152,9 @@ export function PermissionManager() {
     async function load() {
       try {
         setDataLoading(true)
+        const supabase = createClient()
+        const { data: sessionData } = await supabase.auth.getSession()
+
         const [usersRes, foldersRes] = await Promise.all([
           fetch("/api/users"),
           fetch("/api/folders"),
@@ -90,6 +168,13 @@ export function PermissionManager() {
 
         setUsers(usersData.users ?? [])
         setFolders(foldersData.folders ?? [])
+
+        const me = usersData.users?.find(
+          (u: UserOption) => u.id === sessionData?.session?.user?.id,
+        )
+        if (me) {
+          setCurrentUserRole(me.role)
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load data")
       } finally {
@@ -125,6 +210,19 @@ export function PermissionManager() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadPermissions(selectedFolder)
   }, [selectedFolder])
+
+  const handleSelectUser = (userId: string) => {
+    setSelectedUser(userId)
+    if (!userId) {
+      setSelectedActions(new Set())
+      return
+    }
+    const user = users.find((u) => u.id === userId)
+    if (user) {
+      const preset = ROLE_PRESETS[user.role]
+      if (preset) setSelectedActions(new Set(preset))
+    }
+  }
 
   const toggleAction = (action: PermAction) => {
     setSelectedActions((prev) => {
@@ -163,6 +261,61 @@ export function PermissionManager() {
       toast.error(err instanceof Error ? err.message : "Something went wrong")
     } finally {
       setGranting(false)
+    }
+  }
+
+  const handleBulkGrant = async (role: string) => {
+    if (!selectedFolder) return
+    const actions = bulkActions[role]
+    if (!actions || actions.length === 0) {
+      toast.error("Select at least one action")
+      return
+    }
+    setBulkProcessingRole(role)
+    try {
+      const res = await fetch("/api/permissions/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ folderId: selectedFolder, role, actions }),
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error ?? "Failed")
+      }
+      const data = await res.json()
+      toast.success(`Granted to ${data.granted} user${data.granted === 1 ? "" : "s"}`)
+      loadPermissions(selectedFolder)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Something went wrong")
+    } finally {
+      setBulkProcessingRole(null)
+    }
+  }
+
+  const handleBulkRevoke = async (role: string) => {
+    if (!selectedFolder) return
+    setBulkProcessingRole(role)
+    try {
+      const res = await fetch("/api/permissions/bulk/revoke", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ folderId: selectedFolder, role }),
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error ?? "Failed")
+      }
+      const data = await res.json()
+      if (data.revoked > 0) {
+        toast.success(`Revoked from ${data.revoked} user${data.revoked === 1 ? "" : "s"}`)
+      } else {
+        toast("No permissions to revoke")
+      }
+      loadPermissions(selectedFolder)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Something went wrong")
+    } finally {
+      setBulkProcessingRole(null)
     }
   }
 
@@ -261,7 +414,7 @@ export function PermissionManager() {
                 {users.length === 0 ? (
                   <p className="text-sm text-muted-foreground py-2">No users available.</p>
                 ) : (
-                  <Select value={selectedUser} onValueChange={(v) => setSelectedUser(v ?? "")}>
+                  <Select value={selectedUser} onValueChange={(v) => handleSelectUser(v ?? "")}>
                     <SelectTrigger>
                       {selectedUser
                         ? users.find((u) => u.id === selectedUser)?.full_name ?? "Select a user..."
@@ -336,6 +489,134 @@ export function PermissionManager() {
               >
                 {granting ? "Granting..." : "Grant Permission"}
               </Button>
+
+              {selectedFolder && currentUserRole !== "student_assistant" && (
+                <div className="border-t pt-4 mt-2">
+                  <h4 className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground mb-3 flex items-center gap-1.5">
+                    <UsersIcon className="size-3.5" />
+                    Bulk operations
+                  </h4>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {bulkTargetRoles.map(({ value, label, Icon }) => {
+                      const count = userCountByRole[value] ?? 0
+                      const isLoading = bulkProcessingRole === value
+
+                      return (
+                        <div
+                          key={value}
+                          className="relative rounded-lg border bg-card p-3 transition-shadow hover:shadow-sm"
+                        >
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <div className="flex size-8 items-center justify-center rounded-md bg-muted">
+                                <Icon className="size-4 text-muted-foreground" />
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium capitalize leading-none mb-0.5">
+                                  {label}
+                                </p>
+                                <p className="text-[11px] text-muted-foreground">
+                                  {count} {count === 1 ? "user" : "users"}
+                                  {grantedCountByRole[value] > 0 && (
+                                    <span>
+                                      {" "}&middot;{" "}
+                                      {grantedCountByRole[value]} already have access
+                                    </span>
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap gap-1 mb-3">
+                            {ALL_ACTIONS.map((action) => {
+                              const selected = bulkActions[value]?.includes(action)
+                              return (
+                                <button
+                                  key={action}
+                                  type="button"
+                                  onClick={() =>
+                                    setBulkActions((prev) => {
+                                      const current = prev[value] ?? []
+                                      const next = selected
+                                        ? current.filter((a) => a !== action)
+                                        : [...current, action]
+                                      return { ...prev, [value]: next }
+                                    })
+                                  }
+                                  className={`rounded px-2 py-0.5 text-[11px] capitalize transition-colors ${
+                                    selected
+                                      ? "bg-primary text-primary-foreground"
+                                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                                  }`}
+                                >
+                                  {action}
+                                </button>
+                              )
+                            })}
+                          </div>
+
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => handleBulkGrant(value)}
+                              disabled={isLoading}
+                              className="flex-1"
+                            >
+                              {isLoading ? (
+                                <Loader2Icon className="size-3.5 animate-spin mr-1" />
+                              ) : null}
+                              Grant
+                            </Button>
+
+                            <AlertDialog>
+                              <AlertDialogTrigger
+                                className="flex-1 inline-flex items-center justify-center rounded-md border border-destructive/30 px-3 py-1.5 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10 disabled:pointer-events-none disabled:opacity-50"
+                                disabled={isLoading}
+                              >
+                                Revoke all
+                              </AlertDialogTrigger>
+                              <AlertDialogContent size="sm">
+                                <AlertDialogHeader>
+                                  <AlertDialogMedia>
+                                    <Trash2Icon className="size-5 text-destructive" />
+                                  </AlertDialogMedia>
+                                  <AlertDialogTitle>
+                                    Revoke all {label} permissions?
+                                  </AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will remove every permission entry for{" "}
+                                    {label.toLowerCase()} on this folder. They will lose all
+                                    access unless they have access through other means.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    variant="destructive"
+                                    onClick={() => handleBulkRevoke(value)}
+                                  >
+                                    Revoke all
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  <p
+                    className="mt-3 text-[11px] text-muted-foreground/60 leading-relaxed"
+                    style={{ fontFamily: "var(--font-mono)" }}
+                  >
+                    Granting applies to current users only. New users added later
+                    won&apos;t automatically receive access.
+                  </p>
+                </div>
+              )}
             </>
           )}
         </div>

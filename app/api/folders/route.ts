@@ -50,7 +50,51 @@ export async function GET(request: Request) {
       const { data } = await query.order("name")
       folders = data ?? []
     } else if (profile.role === "program_head" && profile.program_id) {
-      folders = await getProgramHeadFolders(profile.program_id, showArchived)
+      let cwQuery = adminClient
+        .from("folders")
+        .select("*")
+        .is("deleted_at", null)
+        .is("program_id", null)
+
+      if (!showArchived) {
+        cwQuery = cwQuery.eq("is_archived", false)
+      }
+
+      const [programFolders, collegeWide, permFolderIds] = await Promise.all([
+        getProgramHeadFolders(profile.program_id, showArchived),
+        cwQuery.order("name"),
+        adminClient
+          .from("permissions")
+          .select("folder_id")
+          .eq("user_id", user.id)
+          .not("folder_id", "is", null),
+      ])
+      folders = [
+        ...(collegeWide.data ?? []),
+        ...programFolders,
+      ]
+
+      const viewedIds = new Set(folders.map((f) => f.id))
+      const permIds = (permFolderIds.data ?? [])
+        .map((p) => p.folder_id!)
+        .filter((id) => !viewedIds.has(id))
+
+      if (permIds.length > 0) {
+        let permQuery = adminClient
+          .from("folders")
+          .select("*")
+          .in("id", permIds)
+          .is("deleted_at", null)
+
+        if (!showArchived) {
+          permQuery = permQuery.eq("is_archived", false)
+        }
+
+        const { data: permFolders } = await permQuery.order("name")
+        if (permFolders) {
+          folders.push(...permFolders)
+        }
+      }
     } else {
       const { data: userPerms } = await adminClient
         .from("permissions")
@@ -138,8 +182,10 @@ export async function POST(request: Request) {
     const adminClient = createAdminClient()
     const { isFolderLocked, hasFolderAction } = await import("@/lib/permission-utils")
 
+    let parentLocked = false
     if (parentId) {
       const locked = await isFolderLocked(parentId)
+      parentLocked = locked
       if (locked) {
         const { canBypassLock } = await import("@/lib/permission-utils")
         if (!(await canBypassLock(user.id))) {
@@ -163,6 +209,7 @@ export async function POST(request: Request) {
           owner_id: user.id,
           created_by: user.id,
           inherit_permissions: true,
+          is_locked: parentLocked || undefined,
         })
         .select()
         .single()
@@ -191,22 +238,49 @@ export async function POST(request: Request) {
             { status: 403 },
           )
         }
-      } else {
-        return NextResponse.json(
-          { error: "Program Heads can only create subfolders, not top-level folders" },
-          { status: 403 },
-        )
       }
 
       const { data: folder, error } = await adminClient
         .from("folders")
         .insert({
           name: name.trim(),
-          parent_id: parentId,
-          program_id: profile.program_id,
+          parent_id: parentId ?? null,
+          program_id: programId ?? null,
           owner_id: user.id,
           created_by: user.id,
           inherit_permissions: true,
+          is_locked: parentLocked || undefined,
+        })
+        .select()
+        .single()
+
+      if (error) {
+        return NextResponse.json(
+          { error: error.message },
+          { status: 500 },
+        )
+      }
+
+      return NextResponse.json({ folder }, { status: 201 })
+    }
+
+    if (parentId) {
+      const { data: parentFolder } = await adminClient
+        .from("folders")
+        .select("program_id")
+        .eq("id", parentId)
+        .single()
+
+      const { data: folder, error } = await adminClient
+        .from("folders")
+        .insert({
+          name: name.trim(),
+          parent_id: parentId,
+          program_id: parentFolder?.program_id ?? null,
+          owner_id: user.id,
+          created_by: user.id,
+          inherit_permissions: true,
+          is_locked: parentLocked || undefined,
         })
         .select()
         .single()
