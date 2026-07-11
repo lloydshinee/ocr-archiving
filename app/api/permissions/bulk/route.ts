@@ -109,7 +109,7 @@ export async function POST(request: Request) {
       action: "bulk_grant_permission",
       resource_type: "folder",
       resource_id: folderId,
-      details: { target_role: role, actions: validActions, user_count: granted },
+      details: { target_role: role, actions: validActions, user_count: granted, item: (await adminClient.from("folders").select("name").eq("id", folderId).single()).data?.name ?? "Unknown" },
     })
 
     return NextResponse.json({ granted })

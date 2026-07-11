@@ -235,8 +235,10 @@ export default async function DocumentPage({
           documentTitle={doc.title}
           isArchived={doc.is_archived ?? false}
           isLocked={isLocked}
+          currentFolderId={doc.folder_id}
           canArchive={await hasDocumentAction(user.id, doc.id, "archive")}
           canDelete={await hasDocumentAction(user.id, doc.id, "delete")}
+          canMove={await hasDocumentAction(user.id, doc.id, "move")}
         />
       </div>
 

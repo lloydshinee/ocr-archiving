@@ -81,6 +81,13 @@ export function AppSidebar({ userRole }: { userRole?: string | null }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showArchived])
 
+  useEffect(() => {
+    const handler = () => refetchFolders()
+    window.addEventListener("refresh-sidebar", handler)
+    return () => window.removeEventListener("refresh-sidebar", handler)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showArchived])
+
   const programMap = new Map(programs.map((p) => [p.id, p.name]))
 
   const collegeWideIds = new Set<string>()

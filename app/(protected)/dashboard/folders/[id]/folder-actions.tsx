@@ -1,8 +1,9 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { LockIcon, UnlockIcon, UserPlusIcon, ArchiveIcon, ArchiveRestoreIcon, Trash2Icon, DownloadIcon, PencilIcon } from "lucide-react"
+import { LockIcon, UnlockIcon, UserPlusIcon, ArchiveIcon, ArchiveRestoreIcon, Trash2Icon, DownloadIcon, PencilIcon, MoveIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import { Switch } from "@/components/ui/switch"
@@ -15,6 +16,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { MoveDialog } from "@/components/move-dialog"
 
 interface FolderActionsProps {
   folderId: string
@@ -23,11 +25,14 @@ interface FolderActionsProps {
   isArchived: boolean
   inheritPermissions: boolean
   hasParent: boolean
+  parentId: string | null
+  programId: string | null
   ownerName: string
   userRole: string
   canArchive: boolean
   canDelete: boolean
   canEdit: boolean
+  canMove: boolean
 }
 
 export function FolderActions({
@@ -37,11 +42,14 @@ export function FolderActions({
   isArchived: initialArchived,
   inheritPermissions: initialInherit,
   hasParent,
+  parentId,
+  programId,
   ownerName,
   userRole,
   canArchive,
   canDelete,
   canEdit,
+  canMove,
 }: FolderActionsProps) {
   const [isLocked, setIsLocked] = useState(initialLocked)
   const [isArchived, setIsArchived] = useState(initialArchived)
@@ -53,10 +61,12 @@ export function FolderActions({
   const [renameOpen, setRenameOpen] = useState(false)
   const [renameValue, setRenameValue] = useState(folderName)
   const [renaming, setRenaming] = useState(false)
+  const router = useRouter()
 
   const canLock = userRole === "dean" || userRole === "program_head"
   const canTransfer = canLock
   const canToggleInherit = userRole === "dean" && hasParent
+  const isProgramRoot = parentId === null && programId !== null
 
   const handleLock = async () => {
     setLoading(true)
@@ -68,6 +78,7 @@ export function FolderActions({
       })
       if (res.ok) {
         setIsLocked(!isLocked)
+        window.dispatchEvent(new CustomEvent("refresh-sidebar"))
         toast.success(isLocked ? "Folder unlocked" : "Folder locked")
       } else {
         const data = await res.json()
@@ -112,6 +123,7 @@ export function FolderActions({
       })
       if (res.ok) {
         setIsArchived(!isArchived)
+        window.dispatchEvent(new CustomEvent("refresh-sidebar"))
         toast.success(isArchived ? "Folder unarchived" : "Folder archived")
       } else {
         const data = await res.json()
@@ -130,7 +142,8 @@ export function FolderActions({
       const res = await fetch(`/api/folders/${folderId}`, { method: "DELETE" })
       if (res.ok) {
         toast.success("Folder moved to Recycle Bin")
-        window.history.back()
+        window.dispatchEvent(new CustomEvent("refresh-sidebar"))
+        router.back()
       } else {
         const data = await res.json()
         toast.error(data.error ?? "Failed")
@@ -163,6 +176,7 @@ export function FolderActions({
       })
       if (res.ok) {
         toast.success(`Ownership transferred to ${targetUser.full_name}`)
+        window.dispatchEvent(new CustomEvent("refresh-sidebar"))
         setTransferOpen(false)
         setTransferEmail("")
       } else {
@@ -197,6 +211,7 @@ export function FolderActions({
         throw new Error(data.error ?? "Failed")
       }
       toast.success("Folder renamed")
+      window.dispatchEvent(new CustomEvent("refresh-sidebar"))
       setRenameOpen(false)
       window.location.reload()
     } catch (err) {
@@ -276,6 +291,23 @@ export function FolderActions({
           </form>
         </DialogContent>
       </Dialog>
+      )}
+
+      {canMove && !isProgramRoot && (
+        <MoveDialog
+          type="folder"
+          itemId={folderId}
+          currentParentId={parentId}
+          itemName={folderName}
+          disabled={isLocked}
+          canMoveToRoot={userRole === "dean" || userRole === "program_head"}
+          trigger={
+            <Button variant="outline" size="sm" disabled={isLocked} className="gap-1.5">
+              <MoveIcon className="size-3.5" />
+              Move
+            </Button>
+          }
+        />
       )}
 
       {canTransfer && (

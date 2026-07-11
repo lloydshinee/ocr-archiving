@@ -33,6 +33,7 @@ interface DocumentDialogProps {
   document?: ExistingDocument
   trigger?: React.ReactElement
   disabled?: boolean
+  nativeButton?: boolean
 }
 
 export function DocumentDialog({
@@ -42,6 +43,7 @@ export function DocumentDialog({
   document,
   trigger,
   disabled,
+  nativeButton,
 }: DocumentDialogProps) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -250,7 +252,7 @@ export function DocumentDialog({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       {trigger ? (
-        <DialogTrigger render={trigger} />
+        <DialogTrigger render={trigger} nativeButton={nativeButton} />
       ) : (
         <DialogTrigger
           render={

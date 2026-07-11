@@ -52,14 +52,14 @@ export default async function FolderPage({
 
   const { data: subfolders } = await adminClient
     .from("folders")
-    .select("id, name, updated_at, owner_id, category_id")
+    .select("id, name, updated_at, owner_id, category_id, is_locked, is_archived")
     .eq("parent_id", id)
     .is("deleted_at", null)
     .order("name")
 
   const { data: documents } = await adminClient
     .from("documents")
-    .select("id, title, file_type, owner_id, created_at, current_version_id, category_id")
+    .select("id, title, file_type, owner_id, created_at, current_version_id, category_id, is_archived")
     .eq("folder_id", id)
     .is("deleted_at", null)
     .order("title")
@@ -187,11 +187,14 @@ export default async function FolderPage({
               isArchived={folder.is_archived ?? false}
               inheritPermissions={folder.inherit_permissions ?? true}
               hasParent={folder.parent_id != null}
+              parentId={folder.parent_id}
+              programId={folder.program_id}
               ownerName={ownerProfile?.full_name ?? "Unknown"}
               userRole={profile?.role ?? ""}
               canArchive={await hasFolderAction(user.id, folder.id, "archive")}
               canDelete={await hasFolderAction(user.id, folder.id, "delete")}
               canEdit={await hasFolderAction(user.id, folder.id, "edit")}
+              canMove={await hasFolderAction(user.id, folder.id, "move")}
             />
           </div>
         </div>
@@ -228,6 +231,7 @@ export default async function FolderPage({
             folderProgramId={folder.program_id}
             canArchive={await hasFolderAction(user.id, folder.id, "archive")}
             canDelete={await hasFolderAction(user.id, folder.id, "delete")}
+            canMove={await hasFolderAction(user.id, folder.id, "move")}
             isLocked={isLocked}
           />
         }

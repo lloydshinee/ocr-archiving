@@ -97,7 +97,7 @@ export async function POST(request: Request) {
       action: "bulk_revoke_permission",
       resource_type: "folder",
       resource_id: folderId,
-      details: { target_role: role, user_count: permsToRevoke.length },
+      details: { target_role: role, user_count: permsToRevoke.length, item: (await adminClient.from("folders").select("name").eq("id", folderId).single()).data?.name ?? "Unknown" },
     })
 
     return NextResponse.json({ revoked: permsToRevoke.length })

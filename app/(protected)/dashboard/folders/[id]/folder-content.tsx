@@ -12,6 +12,8 @@ import {
   EyeIcon,
   SearchIcon,
   FolderOpenIcon,
+  MoveIcon,
+  LockIcon,
 } from "lucide-react"
 import { fileTypeIcon } from "@/lib/file-icons"
 import { Badge } from "@/components/ui/badge"
@@ -37,6 +39,7 @@ import {
 import { toast } from "sonner"
 import { DocumentDialog } from "@/components/document-dialog"
 import { DocumentViewer } from "@/components/document-viewer"
+import { MoveDialog } from "@/components/move-dialog"
 
 const FILE_TYPE_LABELS: Record<string, string> = {
   "application/pdf": "PDF",
@@ -55,6 +58,8 @@ interface Subfolder {
   updated_at: string
   owner_id: string
   category_id: string | null
+  is_locked: boolean
+  is_archived: boolean
 }
 
 interface DocumentItem {
@@ -65,6 +70,7 @@ interface DocumentItem {
   created_at: string
   current_version_id: string | null
   category_id: string | null
+  is_archived: boolean
 }
 
 interface FolderContentProps {
@@ -81,6 +87,7 @@ interface FolderContentProps {
   folderProgramId: string | null
   canArchive: boolean
   canDelete: boolean
+  canMove: boolean
   isLocked: boolean
 }
 
@@ -98,6 +105,7 @@ export function FolderContent({
   folderProgramId,
   canArchive,
   canDelete,
+  canMove,
   isLocked,
 }: FolderContentProps) {
   const router = useRouter()
@@ -105,6 +113,7 @@ export function FolderContent({
   const [viewingDoc, setViewingDoc] = useState<{ id: string; title: string; fileType: string } | null>(null)
   const [search, setSearch] = useState("")
   const [filterType, setFilterType] = useState<string>("all")
+  const [showArchived, setShowArchived] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<{
     type: "folder" | "document"
     id: string
@@ -112,11 +121,13 @@ export function FolderContent({
   } | null>(null)
 
   const filteredSubfolders = useMemo(() => {
+    let items = subfolders
+    if (!showArchived) items = items.filter((sf) => !sf.is_archived)
     if (filterType !== "all" && filterType !== "folders") return []
-    if (!search.trim()) return subfolders
+    if (!search.trim()) return items
     const q = search.toLowerCase()
-    return subfolders.filter((sf) => sf.name.toLowerCase().includes(q))
-  }, [subfolders, search, filterType])
+    return items.filter((sf) => sf.name.toLowerCase().includes(q))
+  }, [subfolders, search, filterType, showArchived])
 
   const fileTypes = useMemo(() => {
     const types = new Set(documents.map((d) => d.file_type))
@@ -126,6 +137,7 @@ export function FolderContent({
   const filteredDocuments = useMemo(() => {
     if (filterType === "folders") return []
     let result = documents
+    if (!showArchived) result = result.filter((d) => !d.is_archived)
     if (search.trim()) {
       const q = search.toLowerCase()
       result = result.filter((d) => d.title.toLowerCase().includes(q))
@@ -134,7 +146,7 @@ export function FolderContent({
       result = result.filter((d) => d.file_type === filterType)
     }
     return result
-  }, [documents, search, filterType])
+  }, [documents, search, filterType, showArchived])
 
   function canEditDoc(ownerId: string) {
     if (userRole === "dean") return true
@@ -152,6 +164,7 @@ export function FolderContent({
       })
       if (res.ok) {
         toast.success(currentlyArchived ? "Document unarchived" : "Document archived")
+        window.dispatchEvent(new CustomEvent("refresh-sidebar"))
         router.refresh()
       } else {
         const data = await res.json()
@@ -170,6 +183,7 @@ export function FolderContent({
       const res = await fetch(`/api/documents/${docId}`, { method: "DELETE" })
       if (res.ok) {
         toast.success("Document moved to Recycle Bin")
+        window.dispatchEvent(new CustomEvent("refresh-sidebar"))
         router.refresh()
       } else {
         const data = await res.json()
@@ -192,6 +206,7 @@ export function FolderContent({
       })
       if (res.ok) {
         toast.success(currentlyArchived ? "Folder unarchived" : "Folder archived")
+        window.dispatchEvent(new CustomEvent("refresh-sidebar"))
         router.refresh()
       } else {
         const data = await res.json()
@@ -210,6 +225,7 @@ export function FolderContent({
       const res = await fetch(`/api/folders/${sfId}`, { method: "DELETE" })
       if (res.ok) {
         toast.success("Folder moved to Recycle Bin")
+        window.dispatchEvent(new CustomEvent("refresh-sidebar"))
         router.refresh()
       } else {
         const data = await res.json()
@@ -305,6 +321,18 @@ export function FolderContent({
                     {FILE_TYPE_LABELS[t] ?? t}
                   </button>
                 ))}
+                <div className="ml-auto flex items-center gap-1.5">
+                  <button
+                    onClick={() => setShowArchived(!showArchived)}
+                    className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors ${
+                      showArchived
+                        ? "bg-amber-200 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                    }`}
+                  >
+                    {showArchived ? "Hide archived" : "Show archived"}
+                  </button>
+                </div>
               </div>
             )}
 
@@ -322,6 +350,14 @@ export function FolderContent({
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="truncate text-sm">{sf.name}</span>
+                        {sf.is_locked && (
+                          <LockIcon className="size-3 shrink-0 text-rose-500" />
+                        )}
+                        {sf.is_archived && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] uppercase tracking-[0.12em] bg-amber-200 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
+                            Archived
+                          </span>
+                        )}
                         {sf.category_id && subfolderCategoryNames.has(sf.category_id) && (
                           <Badge variant="outline" className="text-[10px] shrink-0">
                             {subfolderCategoryNames.get(sf.category_id)}
@@ -355,6 +391,22 @@ export function FolderContent({
                           }
                         />
                         <DropdownMenuContent align="end" className="w-36">
+                          {canMove && !isLocked && (
+                            <MoveDialog
+                              type="folder"
+                              itemId={sf.id}
+                              currentParentId={folderId}
+                              itemName={sf.name}
+                              canMoveToRoot={userRole === "dean" || userRole === "program_head"}
+                              nativeButton={false}
+                              trigger={
+                                <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                                  <MoveIcon className="size-3.5" />
+                                  Move
+                                </DropdownMenuItem>
+                              }
+                            />
+                          )}
                           {canArchive && !isLocked && (
                             <DropdownMenuItem
                               onClick={() => handleArchiveFolder(sf.id, false)}
@@ -365,7 +417,7 @@ export function FolderContent({
                           )}
                           {canDelete && !isLocked && (
                             <>
-                              {canArchive && <DropdownMenuSeparator />}
+                              {(canMove || canArchive) && <DropdownMenuSeparator />}
                               <DropdownMenuItem
                                 variant="destructive"
                                 onClick={() => setConfirmDelete({ type: "folder", id: sf.id, name: sf.name })}
@@ -404,6 +456,11 @@ export function FolderContent({
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="truncate text-sm">{doc.title}</span>
+                        {doc.is_archived && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] uppercase tracking-[0.12em] bg-amber-200 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
+                            Archived
+                          </span>
+                        )}
                         <Badge variant="outline" className="text-[10px] shrink-0">
                           {versionCounts.get(doc.id) ?? 1} version{(versionCounts.get(doc.id) ?? 1) !== 1 ? "s" : ""}
                         </Badge>
@@ -473,6 +530,21 @@ export function FolderContent({
                             <EyeIcon className="size-3.5" />
                             View
                           </DropdownMenuItem>
+                          {canMove && !isLocked && (
+                            <MoveDialog
+                              type="document"
+                              itemId={doc.id}
+                              currentParentId={folderId}
+                              itemName={doc.title}
+                              nativeButton={false}
+                              trigger={
+                                <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                                  <MoveIcon className="size-3.5" />
+                                  Move
+                                </DropdownMenuItem>
+                              }
+                            />
+                          )}
                           {canArchive && !isLocked && (
                             <DropdownMenuItem
                               onClick={() => handleArchiveDoc(doc.id, false)}
@@ -483,7 +555,7 @@ export function FolderContent({
                           )}
                           {canDelete && !isLocked && (
                             <>
-                              <DropdownMenuSeparator />
+                              {(canMove || canArchive) && <DropdownMenuSeparator />}
                               <DropdownMenuItem
                                 variant="destructive"
                                 onClick={() => setConfirmDelete({ type: "document", id: doc.id, name: doc.title })}

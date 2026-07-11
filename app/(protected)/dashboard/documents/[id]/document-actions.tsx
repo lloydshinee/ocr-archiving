@@ -2,17 +2,20 @@
 
 import { useState } from "react"
 import { toast } from "sonner"
-import { ArchiveIcon, ArchiveRestoreIcon, Trash2Icon } from "lucide-react"
+import { ArchiveIcon, ArchiveRestoreIcon, Trash2Icon, MoveIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ConfirmDialog } from "@/components/confirm-dialog"
+import { MoveDialog } from "@/components/move-dialog"
 
 interface DocumentActionsProps {
   documentId: string
   documentTitle: string
   isArchived: boolean
   isLocked?: boolean
+  currentFolderId?: string | null
   canArchive: boolean
   canDelete: boolean
+  canMove: boolean
 }
 
 export function DocumentActions({
@@ -20,8 +23,10 @@ export function DocumentActions({
   documentTitle,
   isArchived: initialArchived,
   isLocked,
+  currentFolderId,
   canArchive,
   canDelete,
+  canMove,
 }: DocumentActionsProps) {
   const [isArchived, setIsArchived] = useState(initialArchived)
   const [loading, setLoading] = useState(false)
@@ -68,6 +73,21 @@ export function DocumentActions({
 
   return (
     <div className="flex flex-wrap gap-2">
+      {canMove && !isLocked && (
+        <MoveDialog
+          type="document"
+          itemId={documentId}
+          currentParentId={currentFolderId ?? null}
+          itemName={documentTitle}
+          trigger={
+            <Button variant="outline" size="sm" className="gap-1.5">
+              <MoveIcon className="size-3.5" />
+              Move
+            </Button>
+          }
+        />
+      )}
+
       {canArchive && (
         <Button
           variant="outline"

@@ -108,21 +108,67 @@ export async function PATCH(
 
     const { data: existing } = await adminClient
       .from("documents")
-      .select("id, owner_id, folder_id")
+      .select("id, title, description, owner_id, folder_id, category_id, document_type_id")
       .eq("id", id)
       .is("deleted_at", null)
       .single()
 
     if (!existing) return NextResponse.json({ error: "Document not found" }, { status: 404 })
 
-    const canEdit = await hasDocumentAction(user.id, id, "edit")
-    if (!canEdit) return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
+    const { data: existingTagLinks } = await adminClient
+      .from("document_tags")
+      .select("tag_id")
+      .eq("document_id", id)
+    const tagIds = existingTagLinks?.map((t) => t.tag_id) ?? []
+    const existingTags: string[] = []
+    if (tagIds.length > 0) {
+      const { data: tagRows } = await adminClient
+        .from("tags")
+        .select("name")
+        .in("id", tagIds)
+      if (tagRows) existingTags.push(...tagRows.map((t) => t.name))
+    }
+    const existingTagsStr = existingTags.join(", ").trim()
 
-    if (existing.folder_id) {
-      const locked = await isFolderLocked(existing.folder_id)
-      if (locked && !(await canBypassLock(user.id))) {
-        return NextResponse.json({ error: "The folder containing this document is locked" }, { status: 403 })
+    const normalizeTags = (s: string | undefined): string => {
+      if (!s || !s.trim()) return ""
+      return s.split(",").map((t) => t.trim()).filter(Boolean).sort().join(", ")
+    }
+    const submittedTags = normalizeTags(tagsStr)
+    const storedTags = normalizeTags(existingTagsStr)
+    const tagsChanged = tagsStr !== undefined && submittedTags !== storedTags
+
+    const oldFolderId = existing.folder_id
+    const moving = folderId !== undefined && folderId !== oldFolderId
+    const hasMetadataChanges =
+      (title !== undefined && title.trim() !== existing.title) ||
+      (description !== undefined && (description?.trim() ?? null) !== (existing.description ?? null)) ||
+      (categoryId !== undefined && (categoryId || null) !== existing.category_id) ||
+      (documentTypeId !== undefined && (documentTypeId || null) !== existing.document_type_id) ||
+      tagsChanged
+
+    if (moving) {
+      const canMove = await hasDocumentAction(user.id, id, "move")
+      if (!canMove) return NextResponse.json({ error: "You do not have permission to move this document" }, { status: 403 })
+
+      if (existing.folder_id) {
+        const locked = await isFolderLocked(existing.folder_id)
+        if (locked && !(await canBypassLock(user.id))) {
+          return NextResponse.json({ error: "The source folder is locked" }, { status: 403 })
+        }
       }
+
+      if (folderId) {
+        const targetLocked = await isFolderLocked(folderId)
+        if (targetLocked && !(await canBypassLock(user.id))) {
+          return NextResponse.json({ error: "The destination folder is locked" }, { status: 403 })
+        }
+      }
+    }
+
+    if (hasMetadataChanges) {
+      const canEdit = await hasDocumentAction(user.id, id, "edit")
+      if (!canEdit) return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
     }
 
     const isDean = profile.role === "dean"
@@ -202,6 +248,32 @@ export async function PATCH(
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
+    if (folderId !== undefined && folderId !== oldFolderId) {
+      const fromName = oldFolderId
+        ? (await adminClient.from("folders").select("name").eq("id", oldFolderId).single()).data?.name
+        : null
+      const toName = folderId
+        ? (await adminClient.from("folders").select("name").eq("id", folderId).single()).data?.name
+        : null
+      await adminClient.from("audit_logs").insert({
+        user_id: user.id,
+        action: "move",
+        resource_type: "document",
+        resource_id: id,
+        details: { item: existing.title, from: fromName ?? "(root)", to: toName ?? "(root)" },
+      })
+    }
+
+    if (hasMetadataChanges) {
+      await adminClient.from("audit_logs").insert({
+        user_id: user.id,
+        action: "edit",
+        resource_type: "document",
+        resource_id: id,
+        details: { item: existing.title },
+      })
+    }
+
     return NextResponse.json({ document: doc })
   } catch {
     return NextResponse.json(
@@ -264,6 +336,7 @@ export async function DELETE(
         action: "delete_document",
         resource_type: "document",
         resource_id: id,
+        details: { item: doc.title },
       })
 
       return NextResponse.json({ success: true })

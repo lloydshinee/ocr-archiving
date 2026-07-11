@@ -58,6 +58,27 @@ export async function POST(request: Request) {
         .select()
         .single()
 
+      const resourceName = folderId
+        ? (await adminClient.from("folders").select("name").eq("id", folderId).single()).data?.name
+        : (await adminClient.from("documents").select("title").eq("id", documentId!).single()).data?.title
+
+      await adminClient.from("audit_logs").insert({
+        user_id: user.id,
+        action: "grant_permission",
+        resource_type: folderId ? "folder" : "document",
+        resource_id: resourceId,
+        details: { target_user_id: userId, actions: validActions, item: resourceName ?? "Unknown" },
+      })
+
+      await adminClient.from("notifications").insert({
+        user_id: userId,
+        type: "permission",
+        title: "Permissions updated",
+        body: `You were granted ${validActions.join(", ")} access on a ${folderId ? "folder" : "document"}`,
+        resource_type: folderId ? "folder" : "document",
+        resource_id: resourceId,
+      })
+
       return NextResponse.json({ permission: updated })
     }
 
@@ -80,12 +101,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
+    const resourceName = folderId
+      ? (await adminClient.from("folders").select("name").eq("id", folderId).single()).data?.name
+      : (await adminClient.from("documents").select("title").eq("id", documentId).single()).data?.title
+
     await adminClient.from("audit_logs").insert({
       user_id: user.id,
       action: "grant_permission",
       resource_type: folderId ? "folder" : "document",
       resource_id: resourceId,
-      details: { target_user_id: userId, actions: validActions },
+      details: { target_user_id: userId, actions: validActions, item: resourceName ?? "Unknown" },
     })
 
     await adminClient.from("notifications").insert({

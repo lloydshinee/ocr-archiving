@@ -61,7 +61,7 @@ export async function PATCH(
 
     const { data: existing } = await adminClient
       .from("folders")
-      .select("id, owner_id, parent_id, program_id, is_locked, inherit_permissions")
+      .select("id, name, owner_id, parent_id, program_id, is_locked, inherit_permissions")
       .eq("id", id)
       .is("deleted_at", null)
       .single()
@@ -88,6 +88,7 @@ export async function PATCH(
         action: body.lock ? "lock_folder" : "unlock_folder",
         resource_type: "folder",
         resource_id: id,
+        details: { item: existing.name },
       })
 
       return NextResponse.json({ folder: updated })
@@ -123,7 +124,7 @@ export async function PATCH(
         action: "transfer_ownership",
         resource_type: "folder",
         resource_id: id,
-        details: { from: oldOwnerId, to: body.transferOwnerTo },
+        details: { item: existing.name, from: oldOwnerId, to: body.transferOwnerTo },
       })
 
       return NextResponse.json({ folder: updated })
@@ -166,13 +167,28 @@ export async function PATCH(
       updateData.name = name.trim()
     }
 
+    const oldParentId = existing.parent_id
+
     if (parentId !== undefined) {
+      const isProgramRoot = existing.parent_id === null && existing.program_id !== null
+      if (isProgramRoot) {
+        return NextResponse.json({ error: "Program root folders cannot be moved" }, { status: 403 })
+      }
+
       const canMove = await hasFolderAction(user.id, id, "move")
       if (!canMove) return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
 
       if (parentId === id) {
         return NextResponse.json({ error: "A folder cannot be moved into itself" }, { status: 400 })
       }
+
+      if (parentId === null) {
+        const bypass = await canBypassLock(user.id)
+        if (!bypass) {
+          return NextResponse.json({ error: "Only the Dean and Program Heads can move folders to the top level" }, { status: 403 })
+        }
+      }
+
       updateData.parent_id = parentId
     }
 
@@ -189,6 +205,32 @@ export async function PATCH(
       .single()
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+    if (name !== undefined && name.trim() !== existing.name) {
+      await adminClient.from("audit_logs").insert({
+        user_id: user.id,
+        action: "edit",
+        resource_type: "folder",
+        resource_id: id,
+        details: { item: existing.name, new_name: name.trim() },
+      })
+    }
+
+    if (parentId !== undefined) {
+      const fromName = oldParentId
+        ? (await adminClient.from("folders").select("name").eq("id", oldParentId).single()).data?.name
+        : null
+      const toName = parentId
+        ? (await adminClient.from("folders").select("name").eq("id", parentId).single()).data?.name
+        : null
+      await adminClient.from("audit_logs").insert({
+        user_id: user.id,
+        action: "move",
+        resource_type: "folder",
+        resource_id: id,
+        details: { item: existing.name, from: fromName ?? "(root)", to: toName ?? "(root)" },
+      })
+    }
 
     return NextResponse.json({ folder })
   } catch {
@@ -220,6 +262,18 @@ export async function DELETE(
 
     if (isPermanent) {
       const allIds = await collectAllDescendantIds(adminClient, id)
+
+      const { data: permLocked } = await adminClient
+        .from("folders")
+        .select("id")
+        .in("id", allIds)
+        .eq("is_locked", true)
+        .is("deleted_at", null)
+
+      if (permLocked && permLocked.length > 0) {
+        return NextResponse.json({ error: "Cannot permanently delete a folder containing locked subfolders" }, { status: 403 })
+      }
+
       // Delete children before parents (parent_id FK constraint)
       allIds.reverse()
 
@@ -279,8 +333,26 @@ export async function DELETE(
       return NextResponse.json({ error: "This folder is locked" }, { status: 403 })
     }
 
-    const now = new Date().toISOString()
     const allIds = await collectAllDescendantIds(adminClient, id)
+
+    const { data: lockedDescendants } = await adminClient
+      .from("folders")
+      .select("id")
+      .in("id", allIds)
+      .eq("is_locked", true)
+      .is("deleted_at", null)
+
+    if (lockedDescendants && lockedDescendants.length > 0) {
+      return NextResponse.json({ error: "Cannot delete a folder containing locked subfolders" }, { status: 403 })
+    }
+
+    const now = new Date().toISOString()
+
+    const { data: folderRows } = await adminClient
+      .from("folders")
+      .select("id, name")
+      .in("id", allIds)
+    const folderNameMap = new Map((folderRows ?? []).map((f) => [f.id, f.name]))
 
     for (const fid of allIds) {
       await adminClient
@@ -294,7 +366,7 @@ export async function DELETE(
         action: "delete_folder",
         resource_type: "folder",
         resource_id: fid,
-        details: { parent_id: fid === id ? null : id },
+        details: { item: folderNameMap.get(fid) ?? "Unknown", parent_id: fid === id ? null : id },
       })
     }
 
@@ -307,7 +379,7 @@ export async function DELETE(
 
       const { data: folderDocs } = await adminClient
         .from("documents")
-        .select("id")
+        .select("id, title")
         .eq("folder_id", fid)
 
       if (folderDocs) {
@@ -317,6 +389,7 @@ export async function DELETE(
             action: "delete_document",
             resource_type: "document",
             resource_id: doc.id,
+            details: { item: doc.title },
           })
         }
       }

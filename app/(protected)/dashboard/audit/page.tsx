@@ -5,7 +5,6 @@ import { ShieldIcon, SearchIcon, ChevronLeftIcon, ChevronRightIcon } from "lucid
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Badge } from "@/components/ui/badge"
 
 interface AuditEntry {
   id: string
@@ -30,51 +29,19 @@ interface AuditData {
 }
 
 const ACTION_LABELS: Record<string, string> = {
-  login: "Login",
-  upload: "Upload",
-  download: "Download",
-  edit: "Edit",
-  delete: "Delete",
-  delete_document: "Delete",
-  restore: "Restore",
-  restore_document: "Restore",
-  move: "Move",
-  folder_create: "Folder Create",
-  grant_permission: "Grant Permission",
-  modify_permission: "Modify Permission",
-  revoke_permission: "Revoke Permission",
-  archive_document: "Archive Document",
-  unarchive_document: "Unarchive Document",
-  archive_folder: "Archive Folder",
-  unarchive_folder: "Unarchive Folder",
-  archive: "Archive",
-  permanent_delete: "Permanent Delete",
-  restore_version: "Restore Version",
-  version_update: "Version Update",
-}
-
-const ACTION_VARIANTS: Record<string, string> = {
-  login: "default",
-  upload: "default",
-  download: "default",
-  edit: "default",
-  delete: "destructive",
-  delete_document: "destructive",
-  restore: "default",
-  restore_document: "default",
-  move: "default",
-  folder_create: "default",
-  grant_permission: "default",
-  modify_permission: "default",
-  revoke_permission: "destructive",
-  archive_document: "secondary",
-  unarchive_document: "secondary",
-  archive_folder: "secondary",
-  unarchive_folder: "secondary",
-  archive: "secondary",
-  permanent_delete: "destructive",
-  restore_version: "default",
-  version_update: "default",
+  login: "Login", upload: "Upload", download: "Download", edit: "Edit",
+  delete: "Delete", delete_document: "Delete", delete_folder: "Delete",
+  restore: "Restore", restore_document: "Restore", restore_folder: "Restore",
+  move: "Move", folder_create: "Create",
+  grant_permission: "Grant", modify_permission: "Modify", revoke_permission: "Revoke",
+  bulk_grant_permission: "Bulk Grant", bulk_revoke_permission: "Bulk Revoke",
+  archive_document: "Archive", unarchive_document: "Unarchive",
+  archive_folder: "Archive", unarchive_folder: "Unarchive",
+  archive: "Archive", permanent_delete: "Purge",
+  restore_version: "Restore Version", version_update: "Version Update",
+  lock_folder: "Lock", unlock_folder: "Unlock",
+  transfer_ownership: "Transfer", ownership_transfer: "Transfer",
+  delete_version: "Delete Version", permission_change: "Permission Change",
 }
 
 const ACTION_COLORS: Record<string, string> = {
@@ -84,13 +51,17 @@ const ACTION_COLORS: Record<string, string> = {
   edit: "bg-sky-200 text-sky-800 dark:bg-sky-900/50 dark:text-sky-300",
   delete: "bg-red-200 text-red-800 dark:bg-red-900/50 dark:text-red-300",
   delete_document: "bg-red-200 text-red-800 dark:bg-red-900/50 dark:text-red-300",
+  delete_folder: "bg-red-200 text-red-800 dark:bg-red-900/50 dark:text-red-300",
   restore: "bg-teal-200 text-teal-800 dark:bg-teal-900/50 dark:text-teal-300",
   restore_document: "bg-teal-200 text-teal-800 dark:bg-teal-900/50 dark:text-teal-300",
+  restore_folder: "bg-teal-200 text-teal-800 dark:bg-teal-900/50 dark:text-teal-300",
   move: "bg-orange-200 text-orange-800 dark:bg-orange-900/50 dark:text-orange-300",
   folder_create: "bg-emerald-200 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300",
   grant_permission: "bg-violet-200 text-violet-800 dark:bg-violet-900/50 dark:text-violet-300",
   modify_permission: "bg-violet-200 text-violet-800 dark:bg-violet-900/50 dark:text-violet-300",
   revoke_permission: "bg-red-200 text-red-800 dark:bg-red-900/50 dark:text-red-300",
+  bulk_grant_permission: "bg-violet-200 text-violet-800 dark:bg-violet-900/50 dark:text-violet-300",
+  bulk_revoke_permission: "bg-red-200 text-red-800 dark:bg-red-900/50 dark:text-red-300",
   archive_document: "bg-amber-200 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300",
   unarchive_document: "bg-amber-200 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300",
   archive_folder: "bg-amber-200 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300",
@@ -99,6 +70,12 @@ const ACTION_COLORS: Record<string, string> = {
   permanent_delete: "bg-red-200 text-red-800 dark:bg-red-900/50 dark:text-red-300",
   restore_version: "bg-teal-200 text-teal-800 dark:bg-teal-900/50 dark:text-teal-300",
   version_update: "bg-sky-200 text-sky-800 dark:bg-sky-900/50 dark:text-sky-300",
+  lock_folder: "bg-rose-200 text-rose-800 dark:bg-rose-900/50 dark:text-rose-300",
+  unlock_folder: "bg-rose-200 text-rose-800 dark:bg-rose-900/50 dark:text-rose-300",
+  transfer_ownership: "bg-purple-200 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300",
+  ownership_transfer: "bg-purple-200 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300",
+  delete_version: "bg-red-200 text-red-800 dark:bg-red-900/50 dark:text-red-300",
+  permission_change: "bg-violet-200 text-violet-800 dark:bg-violet-900/50 dark:text-violet-300",
 }
 
 export default function AuditLogPage() {
@@ -145,6 +122,71 @@ export default function AuditLogPage() {
 
   function formatAction(action: string): string {
     return ACTION_LABELS[action] ?? action.replace(/_/g, " ")
+  }
+
+  function describe(entry: AuditEntry): string {
+    const d = entry.details ?? {}
+    const rt = entry.resource_type
+    const item = d.item ? `"${d.item}"` : d.title ? `"${d.title}"` : d.file_name ? `"${d.file_name}"` : d.new_name ? `"${d.new_name}"` : rt
+
+    switch (entry.action) {
+      case "move":
+        return `moved ${rt} ${item} from "${d.from}" to "${d.to}"`
+      case "upload":
+        return `uploaded ${rt} "${d.file_name}"`
+      case "download":
+        return `downloaded ${rt} "${d.file_name}"`
+      case "edit":
+        return d.new_name
+          ? `renamed ${rt} "${d.item}" to "${d.new_name}"`
+          : `edited ${rt} ${item}`
+      case "folder_create":
+        return `created ${rt} ${item}`
+      case "delete":
+      case "delete_document":
+      case "delete_folder":
+        return `deleted ${rt} ${item}`
+      case "restore":
+      case "restore_document":
+      case "restore_folder":
+        return `restored ${rt} ${item}`
+      case "archive":
+      case "archive_document":
+      case "archive_folder":
+        return `archived ${rt} ${item}`
+      case "unarchive_document":
+      case "unarchive_folder":
+        return `unarchived ${rt} ${item}`
+      case "permanent_delete":
+        return `permanently deleted ${rt} ${item}`
+      case "lock_folder":
+        return `locked ${rt} ${item}`
+      case "unlock_folder":
+        return `unlocked ${rt} ${item}`
+      case "transfer_ownership":
+      case "ownership_transfer":
+        return `transferred ownership of ${rt} ${item}`
+      case "grant_permission":
+        return `granted permissions on ${rt} ${item}`
+      case "modify_permission":
+        return `modified permissions on ${rt} ${item}`
+      case "revoke_permission":
+        return `revoked permissions on ${rt} ${item}`
+      case "bulk_grant_permission":
+        return `bulk granted ${rt} permissions (${d.target_role})`
+      case "bulk_revoke_permission":
+        return `bulk revoked ${rt} permissions (${d.target_role})`
+      case "restore_version":
+        return `restored version ${d.version_number} of ${rt} ${item}`
+      case "version_update":
+        return `updated version of ${rt} ${item}`
+      case "delete_version":
+        return `deleted version ${d.deleted_version} of ${rt} ${item}`
+      case "login":
+        return "logged in"
+      default:
+        return `${entry.action} ${rt} ${item}`
+    }
   }
 
   return (
@@ -274,14 +316,8 @@ export default function AuditLogPage() {
                       >
                         {formatAction(entry.action)}
                       </span>{" "}
-                      {entry.resource_type}{entry.resource_id ? ` #${entry.resource_id.slice(0, 8)}` : ""}
+                      {describe(entry)}
                     </p>
-                    {entry.details && Object.keys(entry.details).length > 0 && (
-                      <p className="mt-0.5 text-[10px] text-muted-foreground/50 font-mono">
-                        {JSON.stringify(entry.details).slice(0, 120)}
-                        {JSON.stringify(entry.details).length > 120 ? "..." : ""}
-                      </p>
-                    )}
                   </div>
                   <span
                     className="shrink-0 text-[11px] text-muted-foreground/50"

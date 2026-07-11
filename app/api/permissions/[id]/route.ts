@@ -66,12 +66,17 @@ export async function PATCH(
       .select()
       .single()
 
+    const resId = (perm.folder_id ?? perm.document_id)!
+    const resourceName = perm.folder_id
+      ? (await adminClient.from("folders").select("name").eq("id", resId).single()).data?.name
+      : (await adminClient.from("documents").select("title").eq("id", resId).single()).data?.title
+
     await adminClient.from("audit_logs").insert({
       user_id: user.id,
       action: "modify_permission",
       resource_type: perm.folder_id ? "folder" : "document",
-      resource_id: perm.folder_id ?? perm.document_id,
-      details: { target_user_id: perm.user_id, previous: current, updated, assign },
+      resource_id: resId,
+      details: { target_user_id: perm.user_id, previous: current, updated, assign, item: resourceName ?? "Unknown" },
     })
 
     await adminClient.from("notifications").insert({
@@ -132,12 +137,17 @@ export async function DELETE(
 
     await adminClient.from("permissions").delete().eq("id", id)
 
+    const revResId = (perm.folder_id ?? perm.document_id)!
+    const revResourceName = perm.folder_id
+      ? (await adminClient.from("folders").select("name").eq("id", revResId).single()).data?.name
+      : (await adminClient.from("documents").select("title").eq("id", revResId).single()).data?.title
+
     await adminClient.from("audit_logs").insert({
       user_id: user.id,
       action: "revoke_permission",
       resource_type: perm.folder_id ? "folder" : "document",
-      resource_id: perm.folder_id ?? perm.document_id,
-      details: { target_user_id: perm.user_id, revoked_actions: perm.actions },
+      resource_id: revResId,
+      details: { target_user_id: perm.user_id, revoked_actions: perm.actions, item: revResourceName ?? "Unknown" },
     })
 
     await adminClient.from("notifications").insert({

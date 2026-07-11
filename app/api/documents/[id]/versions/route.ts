@@ -65,7 +65,7 @@ export async function POST(
 
     const { data: doc } = await adminClient
       .from("documents")
-      .select("id, file_name, current_version_id, folder_id")
+      .select("id, title, file_name, current_version_id, folder_id")
       .eq("id", id)
       .is("deleted_at", null)
       .single()
@@ -151,6 +151,14 @@ export async function POST(
             status: "pending",
           })
         }
+
+        await adminClient.from("audit_logs").insert({
+          user_id: user.id,
+          action: "version_update",
+          resource_type: "document",
+          resource_id: id,
+          details: { item: doc.title, new_version: nextVersion, file_name: file.name },
+        })
       }
 
       return NextResponse.json({ version })

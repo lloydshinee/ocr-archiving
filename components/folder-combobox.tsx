@@ -15,6 +15,7 @@ interface FolderComboboxProps {
   value: string
   onChange: (id: string) => void
   placeholder?: string
+  excludeIds?: string[]
 }
 
 export function FolderCombobox({
@@ -22,26 +23,33 @@ export function FolderCombobox({
   value,
   onChange,
   placeholder = "Search folders...",
+  excludeIds,
 }: FolderComboboxProps) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
   const inputRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
+  const available = useMemo(() => {
+    if (!excludeIds || excludeIds.length === 0) return folders
+    const exclude = new Set(excludeIds)
+    return folders.filter((f) => !exclude.has(f.id))
+  }, [folders, excludeIds])
+
   const selected = useMemo(
-    () => folders.find((f) => f.id === value),
-    [folders, value],
+    () => available.find((f) => f.id === value),
+    [available, value],
   )
 
   const filtered = useMemo(() => {
-    if (!query.trim()) return folders
+    if (!query.trim()) return available
     const q = query.toLowerCase()
-    return folders.filter(
+    return available.filter(
       (f) =>
         f.name.toLowerCase().includes(q) ||
         f.parentPath.toLowerCase().includes(q),
     )
-  }, [folders, query])
+  }, [available, query])
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
