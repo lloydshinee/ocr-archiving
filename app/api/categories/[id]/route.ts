@@ -1,29 +1,18 @@
 import { NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/admin-client"
-import { createClient } from "@/lib/supabase/server"
+import { requireAuth, withErrorHandling } from "@/lib/auth"
 
-export async function PUT(
+export const PUT = withErrorHandling(async (
   request: Request,
   { params }: { params: Promise<{ id: string }> },
-) {
-  try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+) => {
+  const { profile } = await requireAuth()
 
-    const { data: profile } = await supabase
-      .from("users")
-      .select("role")
-      .eq("id", user.id)
-      .single()
+  if (profile.role !== "dean") {
+    return NextResponse.json({ error: "Only the Dean can manage categories." }, { status: 403 })
+  }
 
-    if (!profile || profile.role !== "dean") {
-      return NextResponse.json({ error: "Only the Dean can manage categories." }, { status: 403 })
-    }
-
-    const { id } = await params
+  const { id } = await params
     const { name, description } = await request.json()
 
     if (!name || !name.trim()) {
@@ -50,33 +39,19 @@ export async function PUT(
     }
 
     return NextResponse.json({ category: data })
-  } catch {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
-  }
-}
+})
 
-export async function DELETE(
+export const DELETE = withErrorHandling(async (
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
-) {
-  try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+) => {
+  const { profile } = await requireAuth()
 
-    const { data: profile } = await supabase
-      .from("users")
-      .select("role")
-      .eq("id", user.id)
-      .single()
+  if (profile.role !== "dean") {
+    return NextResponse.json({ error: "Only the Dean can manage categories." }, { status: 403 })
+  }
 
-    if (!profile || profile.role !== "dean") {
-      return NextResponse.json({ error: "Only the Dean can manage categories." }, { status: 403 })
-    }
-
-    const { id } = await params
+  const { id } = await params
     const adminClient = createAdminClient()
 
     const { count: docCount } = await adminClient
@@ -105,7 +80,4 @@ export async function DELETE(
     }
 
     return NextResponse.json({ success: true })
-  } catch {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
-  }
-}
+})

@@ -62,6 +62,19 @@ _Avoid_: Remove, trash, soft-delete
 A holding area for deleted folders and documents. Items restorable within 30 days. The Dean may manually purge individual items before expiry. No automated cleanup job exists yet — expired items must be purged manually by the Dean.
 _Avoid_: Trash, deleted items
 
+### Sidebar Navigation
+
+**Sidebar (folder tree)**:
+The main navigation panel on the left. Organises folders into three sections:
+
+1. **College-Wide Folders** — top-level folders with `program_id = null`. Shared across all programs. Only visible to Dean and Program Heads. The Dean creates them.
+2. **Program Folders** — folders under each program's root folder. Visible to Program Heads and Faculty of that program. Student Assistants see assigned folders.
+3. **Permitted Folders** — folders the user has explicit permission grants on, regardless of program. Shown with their full ancestor path. Empty if the user has no cross-program grants.
+
+Sidebar state (expanded/collapsed sections) and folder tree data are fetched server-side in the layout and passed as props to the sidebar component.
+
+_Avoid_: Navigation, menu, tree view
+
 ### Metadata
 
 **Category**:
@@ -99,12 +112,12 @@ _Avoid_: Blob, S3, file system
 **Optical Character Recognition (OCR)**:
 A background process that extracts text from uploaded documents to enable full-text search. Runs as a standalone polling worker (`scripts/ocr-worker.ts`) that checks the `ocr_jobs` table every 5 seconds.
 
-Supported file types:
-- **PDF** — pdftoppm → Tesseract
-- **JPEG / PNG** — Tesseract directly
-- **DOCX** (Word) — XML text extraction from `word/document.xml`; if empty (image-only document), extracts images from `word/media/` in the ZIP and OCRs them with Tesseract. No LibreOffice needed.
-- **XLSX** (Excel) — XML text extraction (shared strings + cell values)
-- **PPTX** (PowerPoint) — LibreOffice headless → PDF → pdftoppm → Tesseract (requires LibreOffice)
+Supported file types (all pure-Node, no CLI tools):
+- **PDF** — `pdf-parse` (pdfjs-dist) for text; falls back to screenshot → `tesseract.js` for scanned PDFs
+- **JPEG / PNG / TIFF / BMP / GIF** — `tesseract.js` (WASM, in-process)
+- **DOCX** (Word) — `mammoth` for text; if empty (image-only), extracts images from `word/media/` via `adm-zip` and OCRs them with `tesseract.js`
+- **XLSX** (Excel) — `xlsx` (SheetJS) for worksheet text
+- **PPTX** (PowerPoint) — XML text extraction from slide markup via `adm-zip`
 - **TXT** — Read as-is
 
 Unsupported: ZIP (stored as-is, no extraction), binary Office formats (.doc, .xls, .ppt).

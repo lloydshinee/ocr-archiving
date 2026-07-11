@@ -37,13 +37,13 @@ export async function requireAuth(supabase?: SupabaseClient<Database>) {
   return { user, profile: profile as UserProfile }
 }
 
-export function withErrorHandling(
+export function withErrorHandling<Args extends unknown[]>(
   handler: (
     request: Request,
-    ...args: unknown[]
+    ...args: Args
   ) => NextResponse | Promise<NextResponse>,
 ) {
-  return async (request: Request, ...args: unknown[]) => {
+  return async (request: Request, ...args: Args) => {
     try {
       return await handler(request, ...args)
     } catch (error) {

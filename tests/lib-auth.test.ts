@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
+import { NextResponse } from "next/server"
 
 describe("AuthError", () => {
   it("should create an error with status code and message", async () => {
@@ -87,7 +88,7 @@ describe("withErrorHandling", () => {
   it("should return the handler response on success", async () => {
     const { withErrorHandling } = await import("@/lib/auth")
     const handler = withErrorHandling(async () => {
-      return new Response(JSON.stringify({ ok: true }), { status: 200 })
+      return NextResponse.json({ ok: true })
     })
 
     const res = await handler(new Request("http://localhost:3000/test"))

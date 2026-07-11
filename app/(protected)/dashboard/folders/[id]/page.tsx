@@ -8,6 +8,7 @@ import { FolderActions } from "./folder-actions"
 import { FolderPageTabs } from "./folder-page-tabs"
 import { FolderPermissionsPanel } from "@/components/folder-permissions-panel"
 import { canManagePermissions, hasFolderAction, isFolderLocked } from "@/lib/permission-utils"
+import { getFolderBreadcrumbsFromDb } from "@/lib/folder-utils"
 import { FolderContent } from "./folder-content"
 
 export default async function FolderPage({
@@ -26,10 +27,10 @@ export default async function FolderPage({
     .eq("id", user.id)
     .single()
 
-  const canView = await hasFolderAction(user.id, id, "view")
-  if (!canView) redirect("/dashboard/access-denied")
-
   const adminClient = createAdminClient()
+
+  const canView = await hasFolderAction(adminClient, user.id, id, "view")
+  if (!canView) redirect("/dashboard/access-denied")
 
   const { data: folder } = await adminClient
     .from("folders")
@@ -40,15 +41,16 @@ export default async function FolderPage({
 
   if (!folder) notFound()
 
-  const breadcrumbs = await getFolderBreadcrumbs(folder)
+  const breadcrumbs = await getFolderBreadcrumbsFromDb(adminClient, folder.id)
   const canCreate =
     profile?.role === "dean" ||
     (profile?.role === "program_head" &&
       profile.program_id === folder.program_id) ||
-    await hasFolderAction(user.id, folder.id, "create")
+    await hasFolderAction(adminClient, user.id, folder.id, "create")
 
-  const canManagePerms = await canManagePermissions(user.id, folder.id)
-  const isLocked = await isFolderLocked(folder.id)
+  const canManagePerms = await canManagePermissions(adminClient, user.id, folder.id)
+  const canToggleInherit = canManagePerms && folder.parent_id != null
+  const isLocked = await isFolderLocked(adminClient, folder.id)
 
   const { data: subfolders } = await adminClient
     .from("folders")
@@ -191,10 +193,11 @@ export default async function FolderPage({
               programId={folder.program_id}
               ownerName={ownerProfile?.full_name ?? "Unknown"}
               userRole={profile?.role ?? ""}
-              canArchive={await hasFolderAction(user.id, folder.id, "archive")}
-              canDelete={await hasFolderAction(user.id, folder.id, "delete")}
-              canEdit={await hasFolderAction(user.id, folder.id, "edit")}
-              canMove={await hasFolderAction(user.id, folder.id, "move")}
+              canArchive={await hasFolderAction(adminClient, user.id, folder.id, "archive")}
+              canDelete={await hasFolderAction(adminClient, user.id, folder.id, "delete")}
+              canEdit={await hasFolderAction(adminClient, user.id, folder.id, "edit")}
+              canMove={await hasFolderAction(adminClient, user.id, folder.id, "move")}
+              canToggleInherit={canToggleInherit}
             />
           </div>
         </div>
@@ -229,9 +232,9 @@ export default async function FolderPage({
             currentUserId={user.id}
             userRole={profile?.role ?? ""}
             folderProgramId={folder.program_id}
-            canArchive={await hasFolderAction(user.id, folder.id, "archive")}
-            canDelete={await hasFolderAction(user.id, folder.id, "delete")}
-            canMove={await hasFolderAction(user.id, folder.id, "move")}
+            canArchive={await hasFolderAction(adminClient, user.id, folder.id, "archive")}
+            canDelete={await hasFolderAction(adminClient, user.id, folder.id, "delete")}
+            canMove={await hasFolderAction(adminClient, user.id, folder.id, "move")}
             isLocked={isLocked}
           />
         }
@@ -246,32 +249,4 @@ export default async function FolderPage({
   )
 }
 
-async function getFolderBreadcrumbs(folder: {
-  id: string
-  parent_id: string | null
-  name: string
-}): Promise<{ id: string; name: string }[]> {
-  const adminClient = createAdminClient()
-  const breadcrumbs: { id: string; name: string }[] = []
-  let currentId: string | null = folder.parent_id
 
-  const parentChain: { id: string; name: string }[] = []
-
-  while (currentId) {
-    const { data: parent } = await adminClient
-      .from("folders")
-      .select("id, name, parent_id")
-      .eq("id", currentId)
-      .is("deleted_at", null)
-      .single()
-
-    if (!parent) break
-
-    parentChain.unshift({ id: parent.id, name: parent.name })
-    currentId = parent.parent_id
-  }
-
-  breadcrumbs.push(...parentChain, { id: folder.id, name: folder.name })
-
-  return breadcrumbs
-}

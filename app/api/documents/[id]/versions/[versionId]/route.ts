@@ -31,13 +31,13 @@ export async function DELETE(
     }
 
     if (doc.folder_id) {
-      const locked = await isFolderLocked(doc.folder_id)
-      if (locked && !(await canBypassLock(user.id))) {
+      const locked = await isFolderLocked(adminClient, doc.folder_id)
+      if (locked && !(await canBypassLock(adminClient, user.id))) {
         return NextResponse.json({ error: "The folder containing this document is locked" }, { status: 403 })
       }
     }
 
-    const canEdit = await hasDocumentAction(user.id, id, "edit")
+    const canEdit = await hasDocumentAction(adminClient, user.id, id, "edit")
     if (!canEdit) {
       return NextResponse.json({ error: "You don't have permission to modify this document" }, { status: 403 })
     }

@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/admin-client"
-import { getUserProfile } from "@/lib/permission-utils"
+import { requireAuth, withErrorHandling } from "@/lib/auth"
 
 const VALID_ACTIONS = [
   "login", "upload", "download", "edit", "delete", "restore",
@@ -12,18 +11,12 @@ const VALID_ACTIONS = [
   "archive_folder", "unarchive_folder", "restore_version",
 ]
 
-export async function GET(request: Request) {
-  try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+export const GET = withErrorHandling(async (request: Request) => {
+  const { user, profile } = await requireAuth()
 
-    const profile = await getUserProfile(user.id)
-    if (!profile) return NextResponse.json({ error: "Profile not found" }, { status: 404 })
-
-    if (profile.role !== "dean" && profile.role !== "program_head") {
-      return NextResponse.json({ error: "Access denied" }, { status: 403 })
-    }
+  if (profile.role !== "dean" && profile.role !== "program_head") {
+    return NextResponse.json({ error: "Access denied" }, { status: 403 })
+  }
 
     const url = new URL(request.url)
     const urlUserId = url.searchParams.get("user_id")
@@ -118,7 +111,4 @@ export async function GET(request: Request) {
       valid_actions: VALID_ACTIONS,
       users: users ?? [],
     })
-  } catch {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
-  }
-}
+})

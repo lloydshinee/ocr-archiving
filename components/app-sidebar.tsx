@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { FolderIcon, FileTextIcon, PlusIcon } from "lucide-react"
 import {
   Sidebar,
@@ -14,7 +14,6 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-  SidebarMenuSkeleton,
   useSidebar,
 } from "@/components/ui/sidebar"
 import {
@@ -37,56 +36,26 @@ import { toast } from "sonner"
 type FolderRow = Database["public"]["Tables"]["folders"]["Row"]
 type ProgramRow = Database["public"]["Tables"]["programs"]["Row"]
 
-export function AppSidebar({ userRole }: { userRole?: string | null }) {
+export function AppSidebar({
+  userRole,
+  folders: initialFolders,
+  programs: initialPrograms,
+}: {
+  userRole?: string | null
+  folders: FolderRow[]
+  programs: ProgramRow[]
+}) {
   const router = useRouter()
   const { setOpenMobile } = useSidebar()
-  const [folders, setFolders] = useState<FolderRow[]>([])
-  const [programs, setPrograms] = useState<ProgramRow[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [showArchived, setShowArchived] = useState(false)
+  const folders = showArchived
+    ? initialFolders
+    : initialFolders.filter((f) => !f.is_archived)
+  const programs = initialPrograms
   const [creatingFolder, setCreatingFolder] = useState(false)
   const [newFolderName, setNewFolderName] = useState("")
   const [newFolderError, setNewFolderError] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [showArchived, setShowArchived] = useState(false)
-
-  async function refetchFolders() {
-    try {
-      setLoading(true)
-      setError(null)
-
-      const [foldersRes, programsRes] = await Promise.all([
-        fetch(`/api/folders${showArchived ? "?showArchived=true" : ""}`),
-        fetch("/api/folders/programs"),
-      ])
-
-      if (!foldersRes.ok) throw new Error("Failed to load folders")
-      if (!programsRes.ok) throw new Error("Failed to load programs")
-
-      const foldersData = await foldersRes.json()
-      const programsData = await programsRes.json()
-
-      setFolders(foldersData.folders ?? [])
-      setPrograms(programsData.programs ?? [])
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    refetchFolders()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showArchived])
-
-  useEffect(() => {
-    const handler = () => refetchFolders()
-    window.addEventListener("refresh-sidebar", handler)
-    return () => window.removeEventListener("refresh-sidebar", handler)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showArchived])
 
   const programMap = new Map(programs.map((p) => [p.id, p.name]))
 
@@ -190,7 +159,7 @@ export function AppSidebar({ userRole }: { userRole?: string | null }) {
       toast.success("Folder created")
       setDialogOpen(false)
       setNewFolderName("")
-      refetchFolders()
+      router.refresh()
     } catch {
       setNewFolderError("Something went wrong")
     } finally {
@@ -247,23 +216,7 @@ export function AppSidebar({ userRole }: { userRole?: string | null }) {
             />
           </div>
 
-          {loading ? (
-            <div className="flex flex-col gap-2 px-3">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <SidebarMenuSkeleton key={i} showIcon />
-              ))}
-            </div>
-          ) : error ? (
-            <div className="flex flex-col items-center gap-2 px-3 py-6 group-data-[collapsible=icon]:hidden">
-              <p className="text-xs text-sidebar-foreground/60">{error}</p>
-              <button
-                onClick={refetchFolders}
-                className="text-xs text-sidebar-primary hover:underline"
-              >
-                Retry
-              </button>
-            </div>
-          ) : folders.length === 0 ? (
+          {folders.length === 0 ? (
             <SidebarGroup>
               <SidebarGroupLabel>College-Wide</SidebarGroupLabel>
               <SidebarGroupContent>

@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -11,10 +12,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Skeleton } from "@/components/ui/skeleton"
 import { CreateUserDialog } from "@/components/create-user-dialog"
 import { EditUserDialog } from "@/components/edit-user-dialog"
 import { type UserRole } from "@/lib/user-utils"
+import { toast } from "sonner"
 import { Loader2Icon, PlusIcon, PencilIcon, UserXIcon, UserCheckIcon, UsersIcon } from "lucide-react"
 
 interface UserData {
@@ -40,6 +41,7 @@ interface UsersTableProps {
   currentUserRole: UserRole
   currentUserProgramId: string | null
   programs: Program[]
+  users: UserData[]
 }
 
 const ROLE_LABELS: Record<UserRole, string> = {
@@ -80,38 +82,16 @@ export function UsersTable({
   currentUserRole,
   currentUserProgramId,
   programs,
+  users: initialUsers,
 }: UsersTableProps) {
-  const [users, setUsers] = useState<UserData[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [users, setUsers] = useState<UserData[]>(initialUsers)
   const [togglingId, setTogglingId] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<UserData | null>(null)
+  const router = useRouter()
 
   const programMap = new Map(programs.map((p) => [p.id, p.name]))
-
-  const loadUsers = useCallback(async () => {
-    try {
-      const response = await fetch("/api/users")
-      const data = await response.json()
-      if (!response.ok) {
-        setError(data.error ?? "Failed to load users.")
-        setLoading(false)
-        return
-      }
-      setUsers(data.users)
-      setLoading(false)
-    } catch {
-      setError("Could not reach the server.")
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadUsers()
-  }, [loadUsers])
 
   async function toggleDeactivation(user: UserData) {
     setTogglingId(user.id)
@@ -119,73 +99,17 @@ export function UsersTable({
       const response = await fetch(`/api/users/${user.id}`, {
         method: "PATCH",
       })
-      const data = await response.json()
       if (!response.ok) {
-        setError(data.error ?? "Action failed.")
+        const data = await response.json()
+        toast.error(data.error ?? "Action failed.")
         return
       }
-      await loadUsers()
+      router.refresh()
     } catch {
-      setError("Could not reach the server.")
+      toast.error("Could not reach the server.")
     } finally {
       setTogglingId(null)
     }
-  }
-
-  if (error) {
-    return (
-      <div className="flex flex-col items-center gap-3 py-16 text-center">
-        <p className="text-sm text-destructive" role="alert">
-          {error}
-        </p>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            setError(null)
-            setLoading(true)
-            loadUsers()
-          }}
-        >
-          Retry
-        </Button>
-      </div>
-    )
-  }
-
-  if (loading) {
-    return (
-      <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <Skeleton className="h-5 w-24" />
-          <Skeleton className="h-9 w-32" />
-        </div>
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                {["Name", "Email", "Role", "Program", "Status", "Created", "Last Login", ""].map(
-                  (h) => (
-                    <TableHead key={h}>{h}</TableHead>
-                  ),
-                )}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {Array.from({ length: 5 }).map((_, i) => (
-                <TableRow key={i}>
-                  {Array.from({ length: 8 }).map((_, j) => (
-                    <TableCell key={j}>
-                      <Skeleton className="h-4 w-full" />
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </div>
-    )
   }
 
   return (
@@ -330,7 +254,7 @@ export function UsersTable({
         creatorRole={currentUserRole}
         creatorProgramId={currentUserProgramId}
         programs={programs}
-        onCreated={loadUsers}
+        onCreated={() => router.refresh()}
       />
 
       {editingUser && (
@@ -342,7 +266,7 @@ export function UsersTable({
           }}
           user={editingUser}
           programs={programs}
-          onUpdated={loadUsers}
+          onUpdated={() => router.refresh()}
         />
       )}
     </>

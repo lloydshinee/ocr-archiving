@@ -1,3 +1,5 @@
+import type { SupabaseClient } from "@supabase/supabase-js"
+import type { Database } from "@/lib/supabase/database.types"
 import { getUserProfile, hasDocumentAction, hasFolderAction } from "@/lib/permission-utils"
 
 export type SearchResultItem = {
@@ -19,10 +21,11 @@ export type SearchResultItem = {
 }
 
 export async function filterSearchResults(
+  adminClient: SupabaseClient<Database>,
   results: SearchResultItem[],
   userId: string,
 ): Promise<SearchResultItem[]> {
-  const profile = await getUserProfile(userId)
+  const profile = await getUserProfile(adminClient, userId)
   if (!profile) return []
 
   const isDean = profile.role === "dean"
@@ -40,8 +43,8 @@ export async function filterSearchResults(
     }
 
     const canView = result.result_type === "folder"
-      ? await hasFolderAction(userId, result.id, "view")
-      : await hasDocumentAction(userId, result.id, "view")
+      ? await hasFolderAction(adminClient, userId, result.id, "view")
+      : await hasDocumentAction(adminClient, userId, result.id, "view")
 
     if (canView) filtered.push(result)
   }

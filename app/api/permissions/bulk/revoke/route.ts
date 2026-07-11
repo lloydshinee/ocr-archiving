@@ -1,15 +1,12 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/admin-client"
+import { requireAuth, withErrorHandling } from "@/lib/auth"
 import { canManagePermissions } from "@/lib/permission-utils"
 
-export async function POST(request: Request) {
-  try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+export const POST = withErrorHandling(async (request: Request) => {
+  const { user } = await requireAuth()
 
-    const { folderId, role } = await request.json()
+  const { folderId, role } = await request.json()
 
     if (!folderId || !role) {
       return NextResponse.json(
@@ -23,15 +20,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid role" }, { status: 400 })
     }
 
-    const canManage = await canManagePermissions(user.id, folderId)
+    const adminClient = createAdminClient()
+
+    const canManage = await canManagePermissions(adminClient, user.id, folderId)
     if (!canManage) {
       return NextResponse.json(
         { error: "You don't have permission to manage permissions on this folder" },
         { status: 403 },
       )
     }
-
-    const adminClient = createAdminClient()
 
     const { data: profile } = await adminClient
       .from("users")
@@ -101,7 +98,4 @@ export async function POST(request: Request) {
     })
 
     return NextResponse.json({ revoked: permsToRevoke.length })
-  } catch {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
-  }
-}
+})

@@ -1,29 +1,27 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/admin-client"
+import { requireAuth, withErrorHandling } from "@/lib/auth"
 import {
-  getUserProfile,
   hasFolderAction,
   canLockFolder,
   isFolderLocked,
   canBypassLock,
+  canManagePermissions,
 } from "@/lib/permission-utils"
+import { getFolderBreadcrumbsFromDb, collectDescendantIds } from "@/lib/folder-utils"
 
-export async function GET(
+export const GET = withErrorHandling(async (
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
-) {
-  try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+) => {
+  const { user } = await requireAuth()
 
-    const { id } = await params
+  const { id } = await params
 
-    const canView = await hasFolderAction(user.id, id, "view")
-    if (!canView) return NextResponse.json({ error: "Access denied" }, { status: 403 })
+  const adminClient = createAdminClient()
 
-    const adminClient = createAdminClient()
+  const canView = await hasFolderAction(adminClient, user.id, id, "view")
+  if (!canView) return NextResponse.json({ error: "Access denied" }, { status: 403 })
 
     const { data: folder } = await adminClient
       .from("folders")
@@ -34,27 +32,18 @@ export async function GET(
 
     if (!folder) return NextResponse.json({ error: "Folder not found" }, { status: 404 })
 
-    const breadcrumbs = await getFolderBreadcrumbsFromDb(folder)
+    const breadcrumbs = await getFolderBreadcrumbsFromDb(adminClient, folder.id)
 
     return NextResponse.json({ folder, breadcrumbs })
-  } catch {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
-  }
-}
+})
 
-export async function PATCH(
+export const PATCH = withErrorHandling(async (
   request: Request,
   { params }: { params: Promise<{ id: string }> },
-) {
-  try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+) => {
+  const { user, profile } = await requireAuth()
 
-    const profile = await getUserProfile(user.id)
-    if (!profile) return NextResponse.json({ error: "User profile not found" }, { status: 404 })
-
-    const { id } = await params
+  const { id } = await params
     const body = await request.json()
 
     const adminClient = createAdminClient()
@@ -69,7 +58,7 @@ export async function PATCH(
     if (!existing) return NextResponse.json({ error: "Folder not found" }, { status: 404 })
 
     if (body.lock !== undefined) {
-      const canLock = await canLockFolder(user.id, id)
+      const canLock = await canLockFolder(adminClient, user.id, id)
       if (!canLock) return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
 
       const { data: updated } = await adminClient
@@ -131,8 +120,9 @@ export async function PATCH(
     }
 
     if (body.inheritPermissions !== undefined) {
-      if (profile.role !== "dean") {
-        return NextResponse.json({ error: "Only the Dean can change permission inheritance" }, { status: 403 })
+      const canToggle = await canManagePermissions(adminClient, user.id, id)
+      if (!canToggle) {
+        return NextResponse.json({ error: "Only the Dean, Program Head, or folder owner can change permission inheritance" }, { status: 403 })
       }
 
       const { data: updated } = await adminClient
@@ -145,12 +135,12 @@ export async function PATCH(
       return NextResponse.json({ folder: updated })
     }
 
-    const locked = await isFolderLocked(id)
-    if (locked && !(await canBypassLock(user.id))) {
+    const locked = await isFolderLocked(adminClient, id)
+    if (locked && !(await canBypassLock(adminClient, user.id))) {
       return NextResponse.json({ error: "This folder is locked" }, { status: 403 })
     }
 
-    const canEdit = await hasFolderAction(user.id, id, "edit")
+    const canEdit = await hasFolderAction(adminClient, user.id, id, "edit")
     if (!canEdit) return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
 
     const { name, parentId } = body
@@ -175,7 +165,7 @@ export async function PATCH(
         return NextResponse.json({ error: "Program root folders cannot be moved" }, { status: 403 })
       }
 
-      const canMove = await hasFolderAction(user.id, id, "move")
+      const canMove = await hasFolderAction(adminClient, user.id, id, "move")
       if (!canMove) return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
 
       if (parentId === id) {
@@ -183,7 +173,7 @@ export async function PATCH(
       }
 
       if (parentId === null) {
-        const bypass = await canBypassLock(user.id)
+        const bypass = await canBypassLock(adminClient, user.id)
         if (!bypass) {
           return NextResponse.json({ error: "Only the Dean and Program Heads can move folders to the top level" }, { status: 403 })
         }
@@ -233,24 +223,15 @@ export async function PATCH(
     }
 
     return NextResponse.json({ folder })
-  } catch {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
-  }
-}
+})
 
-export async function DELETE(
+export const DELETE = withErrorHandling(async (
   request: Request,
   { params }: { params: Promise<{ id: string }> },
-) {
-  try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+) => {
+  const { user, profile } = await requireAuth()
 
-    const profile = await getUserProfile(user.id)
-    if (!profile) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-
-    const { id } = await params
+  const { id } = await params
     const url = new URL(request.url)
     const isPermanent = url.searchParams.get("permanent") === "true"
 
@@ -261,7 +242,7 @@ export async function DELETE(
     const adminClient = createAdminClient()
 
     if (isPermanent) {
-      const allIds = await collectAllDescendantIds(adminClient, id)
+      const allIds = await collectDescendantIds(adminClient, id)
 
       const { data: permLocked } = await adminClient
         .from("folders")
@@ -325,15 +306,15 @@ export async function DELETE(
       return NextResponse.json({ success: true })
     }
 
-    const canDel = await hasFolderAction(user.id, id, "delete")
+    const canDel = await hasFolderAction(adminClient, user.id, id, "delete")
     if (!canDel) return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
 
-    const locked = await isFolderLocked(id)
-    if (locked && !(await canBypassLock(user.id))) {
+    const locked = await isFolderLocked(adminClient, id)
+    if (locked && !(await canBypassLock(adminClient, user.id))) {
       return NextResponse.json({ error: "This folder is locked" }, { status: 403 })
     }
 
-    const allIds = await collectAllDescendantIds(adminClient, id)
+    const allIds = await collectDescendantIds(adminClient, id)
 
     const { data: lockedDescendants } = await adminClient
       .from("folders")
@@ -396,55 +377,8 @@ export async function DELETE(
     }
 
     return NextResponse.json({ success: true })
-  } catch {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
-  }
-}
+})
 
-async function collectAllDescendantIds(
-  adminClient: ReturnType<typeof createAdminClient>,
-  folderId: string,
-): Promise<string[]> {
-  const result: string[] = [folderId]
-  const { data: children } = await adminClient
-    .from("folders")
-    .select("id")
-    .eq("parent_id", folderId)
 
-  if (children) {
-    for (const child of children) {
-      const descendants = await collectAllDescendantIds(adminClient, child.id)
-      result.push(...descendants)
-    }
-  }
 
-  return result
-}
 
-async function getFolderBreadcrumbsFromDb(
-  folder: { id: string; parent_id: string | null; name: string },
-): Promise<{ id: string; name: string }[]> {
-  const adminClient = createAdminClient()
-  const breadcrumbs: { id: string; name: string }[] = []
-  let currentId: string | null = folder.parent_id
-
-  const parentChain: { id: string; name: string }[] = []
-
-  while (currentId) {
-    const { data: parent } = await adminClient
-      .from("folders")
-      .select("id, name, parent_id")
-      .eq("id", currentId)
-      .is("deleted_at", null)
-      .single()
-
-    if (!parent) break
-
-    parentChain.unshift({ id: parent.id, name: parent.name })
-    currentId = parent.parent_id
-  }
-
-  breadcrumbs.push(...parentChain, { id: folder.id, name: folder.name })
-
-  return breadcrumbs
-}

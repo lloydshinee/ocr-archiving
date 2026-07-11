@@ -1,27 +1,24 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/admin-client"
+import { requireAuth, withErrorHandling } from "@/lib/auth"
 import { canManagePermissions, getFolderEffectivePermissions } from "@/lib/permission-utils"
 
-export async function GET(
+export const GET = withErrorHandling(async (
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
-) {
-  try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+) => {
+  const { user } = await requireAuth()
 
-    const { id } = await params
+  const { id } = await params
 
-    const canManage = await canManagePermissions(user.id, id)
-    if (!canManage) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
-    }
+  const adminClient = createAdminClient()
 
-    const permissions = await getFolderEffectivePermissions(id)
-
-    return NextResponse.json({ permissions })
-  } catch {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  const canManage = await canManagePermissions(adminClient, user.id, id)
+  if (!canManage) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
   }
-}
+
+  const permissions = await getFolderEffectivePermissions(adminClient, id)
+
+  return NextResponse.json({ permissions })
+})

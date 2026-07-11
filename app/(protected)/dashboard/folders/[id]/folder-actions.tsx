@@ -33,6 +33,7 @@ interface FolderActionsProps {
   canDelete: boolean
   canEdit: boolean
   canMove: boolean
+  canToggleInherit: boolean
 }
 
 export function FolderActions({
@@ -50,6 +51,7 @@ export function FolderActions({
   canDelete,
   canEdit,
   canMove,
+  canToggleInherit,
 }: FolderActionsProps) {
   const [isLocked, setIsLocked] = useState(initialLocked)
   const [isArchived, setIsArchived] = useState(initialArchived)
@@ -65,7 +67,6 @@ export function FolderActions({
 
   const canLock = userRole === "dean" || userRole === "program_head"
   const canTransfer = canLock
-  const canToggleInherit = userRole === "dean" && hasParent
   const isProgramRoot = parentId === null && programId !== null
 
   const handleLock = async () => {
@@ -78,7 +79,7 @@ export function FolderActions({
       })
       if (res.ok) {
         setIsLocked(!isLocked)
-        window.dispatchEvent(new CustomEvent("refresh-sidebar"))
+        router.refresh()
         toast.success(isLocked ? "Folder unlocked" : "Folder locked")
       } else {
         const data = await res.json()
@@ -123,7 +124,7 @@ export function FolderActions({
       })
       if (res.ok) {
         setIsArchived(!isArchived)
-        window.dispatchEvent(new CustomEvent("refresh-sidebar"))
+        router.refresh()
         toast.success(isArchived ? "Folder unarchived" : "Folder archived")
       } else {
         const data = await res.json()
@@ -142,7 +143,7 @@ export function FolderActions({
       const res = await fetch(`/api/folders/${folderId}`, { method: "DELETE" })
       if (res.ok) {
         toast.success("Folder moved to Recycle Bin")
-        window.dispatchEvent(new CustomEvent("refresh-sidebar"))
+        router.refresh()
         router.back()
       } else {
         const data = await res.json()
@@ -176,7 +177,7 @@ export function FolderActions({
       })
       if (res.ok) {
         toast.success(`Ownership transferred to ${targetUser.full_name}`)
-        window.dispatchEvent(new CustomEvent("refresh-sidebar"))
+        router.refresh()
         setTransferOpen(false)
         setTransferEmail("")
       } else {
@@ -211,9 +212,8 @@ export function FolderActions({
         throw new Error(data.error ?? "Failed")
       }
       toast.success("Folder renamed")
-      window.dispatchEvent(new CustomEvent("refresh-sidebar"))
       setRenameOpen(false)
-      window.location.reload()
+      router.refresh()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Something went wrong")
     } finally {

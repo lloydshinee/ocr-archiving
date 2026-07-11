@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/admin-client"
+import { requireAuth, withErrorHandling } from "@/lib/auth"
 import { isFolderLocked, canBypassLock, hasDocumentAction } from "@/lib/permission-utils"
 
 const TEXT_EXTRACTABLE_TYPES = [
@@ -12,53 +12,31 @@ const TEXT_EXTRACTABLE_TYPES = [
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 ]
 
-export async function GET(
+export const GET = withErrorHandling(async (
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
-) {
-  try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+) => {
+  const { user } = await requireAuth()
 
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+  const { id } = await params
+  const adminClient = createAdminClient()
 
-    const { id } = await params
-    const adminClient = createAdminClient()
+  const { data: versions } = await adminClient
+    .from("document_versions")
+    .select("*, created_by_user:users!document_versions_created_by_fkey(full_name)")
+    .eq("document_id", id)
+    .order("version_number", { ascending: false })
 
-    const { data: versions } = await adminClient
-      .from("document_versions")
-      .select("*, created_by_user:users!document_versions_created_by_fkey(full_name)")
-      .eq("document_id", id)
-      .order("version_number", { ascending: false })
+  return NextResponse.json({ versions: versions ?? [] })
+})
 
-    return NextResponse.json({ versions: versions ?? [] })
-  } catch {
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    )
-  }
-}
-
-export async function POST(
+export const POST = withErrorHandling(async (
   request: Request,
   { params }: { params: Promise<{ id: string }> },
-) {
-  try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+) => {
+  const { user } = await requireAuth()
 
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    const { id } = await params
+  const { id } = await params
     const isReplace = new URL(request.url).searchParams.get("replace") === "true"
 
     const adminClient = createAdminClient()
@@ -75,13 +53,13 @@ export async function POST(
     }
 
     if (doc.folder_id) {
-      const locked = await isFolderLocked(doc.folder_id)
-      if (locked && !(await canBypassLock(user.id))) {
+      const locked = await isFolderLocked(adminClient, doc.folder_id)
+      if (locked && !(await canBypassLock(adminClient, user.id))) {
         return NextResponse.json({ error: "The folder containing this document is locked" }, { status: 403 })
       }
     }
 
-    const canEdit = await hasDocumentAction(user.id, id, "edit")
+    const canEdit = await hasDocumentAction(adminClient, user.id, id, "edit")
     if (!canEdit) {
       return NextResponse.json({ error: "You don't have permission to modify this document" }, { status: 403 })
     }
@@ -252,10 +230,4 @@ export async function POST(
     })
 
     return NextResponse.json({ version: restoredVersion })
-  } catch {
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    )
-  }
-}
+})

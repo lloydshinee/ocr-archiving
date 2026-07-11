@@ -1,19 +1,16 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/admin-client"
+import { requireAuth, withErrorHandling } from "@/lib/auth"
 
-export async function POST(
+export const POST = withErrorHandling(async (
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
-) {
-  try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+) => {
+  const { user } = await requireAuth()
 
-    const { id } = await params
+  const { id } = await params
 
-    const adminClient = createAdminClient()
+  const adminClient = createAdminClient()
 
     const { data: doc } = await adminClient
       .from("documents")
@@ -40,7 +37,4 @@ export async function POST(
     })
 
     return NextResponse.json({ success: true })
-  } catch {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
-  }
-}
+})

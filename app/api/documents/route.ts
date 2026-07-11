@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/admin-client"
+import { requireAuth, withErrorHandling } from "@/lib/auth"
 import { isFolderLocked, canBypassLock, hasFolderAction } from "@/lib/permission-utils"
 
 const ACCEPTED_MIME_TYPES = [
@@ -25,18 +25,10 @@ const TEXT_EXTRACTABLE_TYPES = [
 
 const MAX_FILE_SIZE = 100 * 1024 * 1024
 
-export async function POST(request: Request) {
-  try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+export const POST = withErrorHandling(async (request: Request) => {
+  const { user } = await requireAuth()
 
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    const formData = await request.formData()
+  const formData = await request.formData()
     const file = formData.get("file") as File | null
     const title = formData.get("title") as string | null
     const description = formData.get("description") as string | null
@@ -80,12 +72,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Folder not found" }, { status: 404 })
     }
 
-    const locked = await isFolderLocked(folderId)
-    if (locked && !(await canBypassLock(user.id))) {
+    const locked = await isFolderLocked(adminClient, folderId)
+    if (locked && !(await canBypassLock(adminClient, user.id))) {
       return NextResponse.json({ error: "This folder is locked" }, { status: 403 })
     }
 
-    const canCreate = await hasFolderAction(user.id, folderId, "create")
+    const canCreate = await hasFolderAction(adminClient, user.id, folderId, "create")
     if (!canCreate) {
       return NextResponse.json({ error: "You don't have permission to upload to this folder" }, { status: 403 })
     }
@@ -223,10 +215,4 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ document: doc }, { status: 201 })
-  } catch {
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    )
-  }
-}
+})

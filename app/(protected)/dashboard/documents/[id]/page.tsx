@@ -17,6 +17,7 @@ import { VersionActions } from "@/components/version-actions";
 import { hasDocumentAction, getUserProfile, isFolderLocked } from "@/lib/permission-utils";
 import { OcrStatusBadge } from "@/components/ocr-status-badge";
 import { isOcrEligible } from "@/lib/search-utils";
+import { getFolderBreadcrumbsFromDb } from "@/lib/folder-utils";
 
 export default async function DocumentPage({
   params,
@@ -30,9 +31,9 @@ export default async function DocumentPage({
   } = await supabase.auth.getUser();
   if (!user) notFound();
 
-  const profile = await getUserProfile(user.id);
-
   const adminClient = createAdminClient();
+
+  const profile = await getUserProfile(adminClient, user.id);
 
   const { data: doc } = await adminClient
     .from("documents")
@@ -43,7 +44,7 @@ export default async function DocumentPage({
 
   if (!doc) notFound();
 
-  const isLocked = doc.folder_id ? await isFolderLocked(doc.folder_id) : false;
+  const isLocked = doc.folder_id ? await isFolderLocked(adminClient, doc.folder_id) : false;
 
   const categoryPromise = doc.category_id
     ? adminClient
@@ -97,7 +98,7 @@ export default async function DocumentPage({
 
   const currentVersion = versions?.find((v) => v.id === doc.current_version_id);
 
-  const breadcrumbs = await getFolderPath(doc.folder_id);
+  const breadcrumbs = await getFolderBreadcrumbsFromDb(adminClient, doc.folder_id);
   breadcrumbs.push({ id: doc.id, name: doc.title });
 
   return (
@@ -214,7 +215,7 @@ export default async function DocumentPage({
             ?.version_number ?? "?"}
           )
         </a>
-        {await hasDocumentAction(user.id, doc.id, "edit") && (
+        {await hasDocumentAction(adminClient, user.id, doc.id, "edit") && (
           <DocumentDialog
             mode="edit"
             folderId={doc.folder_id ?? ""}
@@ -236,9 +237,9 @@ export default async function DocumentPage({
           isArchived={doc.is_archived ?? false}
           isLocked={isLocked}
           currentFolderId={doc.folder_id}
-          canArchive={await hasDocumentAction(user.id, doc.id, "archive")}
-          canDelete={await hasDocumentAction(user.id, doc.id, "delete")}
-          canMove={await hasDocumentAction(user.id, doc.id, "move")}
+          canArchive={await hasDocumentAction(adminClient, user.id, doc.id, "archive")}
+          canDelete={await hasDocumentAction(adminClient, user.id, doc.id, "delete")}
+          canMove={await hasDocumentAction(adminClient, user.id, doc.id, "move")}
         />
       </div>
 
@@ -318,33 +319,4 @@ export default async function DocumentPage({
   );
 }
 
-async function getFolderPath(
-  folderId: string,
-): Promise<{ id: string; name: string }[]> {
-  const adminClient = createAdminClient();
-  const breadcrumbs: { id: string; name: string }[] = [];
-  let currentId: string | null = folderId;
 
-  while (currentId) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const result: any = await adminClient
-      .from("folders")
-      .select("id, name, parent_id")
-      .eq("id", currentId)
-      .is("deleted_at", null)
-      .single();
-
-    const folder = result.data as {
-      id: string;
-      name: string;
-      parent_id: string | null;
-    } | null;
-
-    if (!folder) break;
-
-    breadcrumbs.unshift({ id: folder.id, name: folder.name });
-    currentId = folder.parent_id;
-  }
-
-  return breadcrumbs;
-}

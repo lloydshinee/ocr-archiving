@@ -1,33 +1,31 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/admin-client"
+import { requireAuth, withErrorHandling } from "@/lib/auth"
 import { hasFolderAction, isFolderLocked, canBypassLock } from "@/lib/permission-utils"
+import { collectDescendantIds } from "@/lib/folder-utils"
 
-export async function POST(
+export const POST = withErrorHandling(async (
   request: Request,
   { params }: { params: Promise<{ id: string }> },
-) {
-  try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+) => {
+  const { user } = await requireAuth()
 
-    const { id } = await params
+  const { id } = await params
     const { archive } = await request.json()
 
     if (typeof archive !== "boolean") {
       return NextResponse.json({ error: "archive (boolean) is required" }, { status: 400 })
     }
 
-    const canArchive = await hasFolderAction(user.id, id, "archive")
+    const adminClient = createAdminClient()
+
+    const canArchive = await hasFolderAction(adminClient, user.id, id, "archive")
     if (!canArchive) return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
 
-    const locked = await isFolderLocked(id)
-    if (locked && !(await canBypassLock(user.id))) {
+    const locked = await isFolderLocked(adminClient, id)
+    if (locked && !(await canBypassLock(adminClient, user.id))) {
       return NextResponse.json({ error: "This folder is locked" }, { status: 403 })
     }
-
-    const adminClient = createAdminClient()
     const now = new Date().toISOString()
 
     if (archive) {
@@ -61,10 +59,7 @@ export async function POST(
     }
 
     return NextResponse.json({ folder })
-  } catch {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
-  }
-}
+})
 
 async function archiveFolderWithChildren(
   adminClient: ReturnType<typeof createAdminClient>,
@@ -72,7 +67,7 @@ async function archiveFolderWithChildren(
   userId: string,
   now: string,
 ) {
-  const allIds = await collectDescendantIds(adminClient, folderId)
+  const allIds = await collectDescendantIds(adminClient, folderId, { excludeDeleted: true })
 
   for (const fid of allIds) {
     const { data: folder } = await adminClient
@@ -118,7 +113,7 @@ async function unarchiveFolderWithChildren(
   adminClient: ReturnType<typeof createAdminClient>,
   folderId: string,
 ) {
-  const allIds = await collectDescendantIds(adminClient, folderId)
+  const allIds = await collectDescendantIds(adminClient, folderId, { excludeDeleted: true })
 
   for (const fid of allIds) {
     const { data: folder } = await adminClient
@@ -160,23 +155,4 @@ async function unarchiveFolderWithChildren(
   }
 }
 
-async function collectDescendantIds(
-  adminClient: ReturnType<typeof createAdminClient>,
-  folderId: string,
-): Promise<string[]> {
-  const result: string[] = [folderId]
-  const { data: children } = await adminClient
-    .from("folders")
-    .select("id")
-    .eq("parent_id", folderId)
-    .is("deleted_at", null)
 
-  if (children) {
-    for (const child of children) {
-      const descendants = await collectDescendantIds(adminClient, child.id)
-      result.push(...descendants)
-    }
-  }
-
-  return result
-}

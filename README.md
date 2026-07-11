@@ -27,7 +27,7 @@ A document archiving and records management system for the College of Computer S
 | Database | Supabase PostgreSQL (11 tables, full-text search via tsvector) |
 | Auth | Supabase Auth (email/password) |
 | Storage | Supabase Storage (`documents` bucket) |
-| OCR | Tesseract + pdftoppm (polling worker). LibreOffice optional — only needed for PPTX support |
+| OCR | `tesseract.js` (WASM) + `pdf-parse` (polling worker). Pure Node — no CLI tools required |
 | UI Primitives | @base-ui/react |
 | Testing | Vitest + jsdom + @testing-library/react |
 
@@ -38,26 +38,7 @@ A document archiving and records management system for the College of Computer S
 - **Node.js** >= 18 (uses `^20` types, recommend 20 LTS or later)
 - **npm** (or pnpm, yarn, bun)
 - **Docker Compose** for the local Supabase stack — or a remote Supabase project if you prefer
-- **Required for OCR**:
-  - `tesseract-ocr` (CLI, with English language pack)
-  - `poppler-utils` (provides `pdftoppm`) — for PDF OCR
-  - `python3` — for DOCX/XLSX text extraction and PDF OCR pipeline
-- **Optional**:
-  - `libreoffice` (headless) — only needed if you want PPTX OCR support
-
-### Installing OCR dependencies (Ubuntu/Debian)
-
-```bash
-# Required for full-text search on uploaded documents
-sudo apt install tesseract-ocr poppler-utils python3
-
-# Optional — only if you need PPTX OCR
-sudo apt install libreoffice-core libreoffice-impress
-```
-
-> **Without OCR deps, the app still works** — uploads, downloads, metadata, permissions, search all function normally. Only OCR-based full-text search of documents will be unavailable (search relies on filenames and metadata).
-
-> **Microsoft Word (.docx) and Excel (.xlsx) OCR does not need LibreOffice** — text is extracted via XML parsing. For image-only DOCX files (scanned pages), images are OCR'd directly with Tesseract.
+- **No OCR system dependencies required** — all extraction uses pure-Node libraries (`tesseract.js`, `pdf-parse`, `mammoth`, `xlsx`, `adm-zip`). No `tesseract`, `poppler-utils`, `libreoffice`, or `python3` needed.
 
 ---
 
@@ -123,12 +104,12 @@ npm run worker
 
 The worker polls the `ocr_jobs` table every 5 seconds, processes pending jobs, and updates `document_versions.ocr_text` with extracted text.
 
-Supported formats:
-- **PDF** → pdftoppm → Tesseract
-- **JPEG/PNG** → Tesseract directly
-- **DOCX** → XML text extraction; if empty (image-only), extracts images from ZIP and OCRs them with Tesseract
-- **XLSX** → XML text extraction (shared strings + cell values)
-- **PPTX** → Requires LibreOffice (converts to PDF → pdftoppm → Tesseract)
+Supported formats (all pure-Node, no CLI tools):
+- **PDF** → `pdf-parse` (pdfjs-dist) for text; falls back to screenshot → `tesseract.js` for scanned PDFs
+- **JPEG/PNG/TIFF/BMP/GIF** → `tesseract.js` (WASM, in-process)
+- **DOCX** → `mammoth` for text; falls back to `adm-zip` + `tesseract.js` for image-only DOCX
+- **XLSX** → `xlsx` (SheetJS) for worksheet text
+- **PPTX** → `adm-zip` + XML text extraction from slide markup
 - **TXT** → Read as-is
 
 > The worker needs the same Supabase env vars as the app (`NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`).

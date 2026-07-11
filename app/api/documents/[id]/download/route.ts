@@ -1,23 +1,15 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/admin-client"
+import { requireAuth, withErrorHandling } from "@/lib/auth"
 
-export async function GET(
+export const GET = withErrorHandling(async (
   request: Request,
   { params }: { params: Promise<{ id: string }> },
-) {
-  try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+) => {
+  const { user } = await requireAuth()
 
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    const { id } = await params
-    const adminClient = createAdminClient()
+  const { id } = await params
+  const adminClient = createAdminClient()
 
     const { searchParams } = new URL(request.url)
     const versionId = searchParams.get("version")
@@ -74,10 +66,4 @@ export async function GET(
     headers.set("Content-Length", version.file_size.toString())
 
     return new NextResponse(file, { headers })
-  } catch {
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    )
-  }
-}
+})

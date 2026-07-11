@@ -1,18 +1,11 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/admin-client"
-import { getUserProfile } from "@/lib/permission-utils"
+import { requireAuth, withErrorHandling } from "@/lib/auth"
 
-export async function GET() {
-  try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+export const GET = withErrorHandling(async () => {
+  const { user, profile } = await requireAuth()
 
-    const profile = await getUserProfile(user.id)
-    if (!profile) return NextResponse.json({ error: "Profile not found" }, { status: 404 })
-
-    const adminClient = createAdminClient()
+  const adminClient = createAdminClient()
     const isDean = profile.role === "dean"
     const isProgramHead = profile.role === "program_head"
 
@@ -191,7 +184,4 @@ export async function GET() {
       role: profile.role,
       recent_documents: recentDocuments ?? [],
     })
-  } catch {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
-  }
-}
+})

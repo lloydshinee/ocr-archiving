@@ -164,7 +164,6 @@ export function FolderContent({
       })
       if (res.ok) {
         toast.success(currentlyArchived ? "Document unarchived" : "Document archived")
-        window.dispatchEvent(new CustomEvent("refresh-sidebar"))
         router.refresh()
       } else {
         const data = await res.json()
@@ -183,7 +182,6 @@ export function FolderContent({
       const res = await fetch(`/api/documents/${docId}`, { method: "DELETE" })
       if (res.ok) {
         toast.success("Document moved to Recycle Bin")
-        window.dispatchEvent(new CustomEvent("refresh-sidebar"))
         router.refresh()
       } else {
         const data = await res.json()
@@ -206,7 +204,6 @@ export function FolderContent({
       })
       if (res.ok) {
         toast.success(currentlyArchived ? "Folder unarchived" : "Folder archived")
-        window.dispatchEvent(new CustomEvent("refresh-sidebar"))
         router.refresh()
       } else {
         const data = await res.json()
@@ -225,7 +222,6 @@ export function FolderContent({
       const res = await fetch(`/api/folders/${sfId}`, { method: "DELETE" })
       if (res.ok) {
         toast.success("Folder moved to Recycle Bin")
-        window.dispatchEvent(new CustomEvent("refresh-sidebar"))
         router.refresh()
       } else {
         const data = await res.json()

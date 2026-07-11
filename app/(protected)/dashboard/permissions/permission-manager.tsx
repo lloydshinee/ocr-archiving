@@ -1,9 +1,9 @@
 "use client"
 
 import { useEffect, useState, useMemo } from "react"
+import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Trash2Icon, FolderPlusIcon, Loader2Icon, UsersIcon, GraduationCapIcon, UserCogIcon, UserCheckIcon } from "lucide-react"
-import { createClient } from "@/lib/supabase/browser"
 import { Button } from "@/components/ui/button"
 import {
   Select,
@@ -77,20 +77,28 @@ const ROLE_CONFIG = [
   { value: "program_head", label: "Program Heads", Icon: UserCogIcon },
 ]
 
-export function PermissionManager() {
-  const [users, setUsers] = useState<UserOption[]>([])
-  const [folders, setFolders] = useState<FolderRow[]>([])
+interface PermissionManagerProps {
+  initialUsers: { id: string; full_name: string; role: string }[]
+  initialFolders: FolderRow[]
+  currentUserRole: string
+}
+
+export function PermissionManager({
+  initialUsers,
+  initialFolders,
+  currentUserRole: initialCurrentUserRole,
+}: PermissionManagerProps) {
+  const [users, setUsers] = useState<UserOption[]>(initialUsers)
+  const [folders, setFolders] = useState<FolderRow[]>(initialFolders)
   const [selectedUser, setSelectedUser] = useState<string>("")
   const [selectedFolder, setSelectedFolder] = useState<string>("")
   const [selectedActions, setSelectedActions] = useState<Set<PermAction>>(new Set())
   const [granting, setGranting] = useState(false)
   const [bulkProcessingRole, setBulkProcessingRole] = useState<string | null>(null)
   const [bulkActions, setBulkActions] = useState<Record<string, PermAction[]>>({})
-  const [dataLoading, setDataLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [folderPermissions, setFolderPermissions] = useState<PermissionEntry[]>([])
   const [permsLoading, setPermsLoading] = useState(false)
-  const [currentUserRole, setCurrentUserRole] = useState<string>("faculty")
+  const [currentUserRole, setCurrentUserRole] = useState<string>(initialCurrentUserRole)
 
   const userCountByRole = useMemo(() => {
     const counts: Record<string, number> = {}
@@ -148,41 +156,7 @@ export function PermissionManager() {
     [folders],
   )
 
-  useEffect(() => {
-    async function load() {
-      try {
-        setDataLoading(true)
-        const supabase = createClient()
-        const { data: sessionData } = await supabase.auth.getSession()
-
-        const [usersRes, foldersRes] = await Promise.all([
-          fetch("/api/users"),
-          fetch("/api/folders"),
-        ])
-
-        if (!usersRes.ok) throw new Error("Failed to load users")
-        if (!foldersRes.ok) throw new Error("Failed to load folders")
-
-        const usersData = await usersRes.json()
-        const foldersData = await foldersRes.json()
-
-        setUsers(usersData.users ?? [])
-        setFolders(foldersData.folders ?? [])
-
-        const me = usersData.users?.find(
-          (u: UserOption) => u.id === sessionData?.session?.user?.id,
-        )
-        if (me) {
-          setCurrentUserRole(me.role)
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load data")
-      } finally {
-        setDataLoading(false)
-      }
-    }
-    load()
-  }, [])
+  // Permissions are fetched when a folder is selected (see loadPermissions)
 
   async function loadPermissions(folderId: string) {
     if (!folderId) {
@@ -378,24 +352,11 @@ export function PermissionManager() {
         </p>
       </div>
 
-      {error && (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3">
-          <p className="text-sm text-destructive">{error}</p>
-        </div>
-      )}
-
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="flex flex-col gap-4 rounded-lg border p-6">
           <h2 className="text-sm font-semibold">Grant Permission</h2>
 
-          {dataLoading ? (
-            <div className="flex flex-col gap-4">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-16 w-full" />
-              <Skeleton className="h-10 w-full" />
-            </div>
-          ) : folders.length === 0 ? (
+          {folders.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-8 text-center">
               <FolderPlusIcon className="size-8 text-muted-foreground/30" />
               <p className="text-sm text-muted-foreground">

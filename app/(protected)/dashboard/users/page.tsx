@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/admin-client"
 import { UsersTable } from "@/components/users-table"
+import { getUsers, getPrograms } from "@/lib/data-fetching"
 import { redirect } from "next/navigation"
 
 export default async function UsersPage() {
@@ -22,10 +24,14 @@ export default async function UsersPage() {
     redirect("/dashboard")
   }
 
-  const { data: programs } = await supabase
-    .from("programs")
-    .select("id, name")
-    .order("name")
+  const adminClient = createAdminClient()
+  const [users, programs] = await Promise.all([
+    getUsers(adminClient, user.id, {
+      role: profile.role,
+      program_id: profile.program_id,
+    }),
+    getPrograms(adminClient),
+  ])
 
   return (
     <div className="flex flex-col gap-6">
@@ -49,7 +55,8 @@ export default async function UsersPage() {
         currentUserId={user.id}
         currentUserRole={profile.role}
         currentUserProgramId={profile.program_id}
-        programs={programs ?? []}
+        programs={programs}
+        users={users}
       />
     </div>
   )

@@ -1,9 +1,11 @@
 import { Separator } from "@/components/ui/separator"
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/admin-client"
 import { SignoutButton } from "@/components/signout-button"
 import { AppSidebar } from "@/components/app-sidebar"
 import { NotificationBell } from "@/components/notification-bell"
 import { AdminMenu } from "@/components/admin-menu"
+import { getSidebarFolders, getPrograms } from "@/lib/data-fetching"
 import {
   SidebarProvider,
   SidebarTrigger,
@@ -30,9 +32,25 @@ export default async function ProtectedLayout({
     profile &&
     (profile.role === "dean" || profile.role === "program_head")
 
+  const adminClient = createAdminClient()
+  const [folders, programs] =
+    user && profile
+      ? await Promise.all([
+          getSidebarFolders(adminClient, user.id, {
+            role: profile.role,
+            program_id: profile.program_id,
+          }),
+          getPrograms(adminClient),
+        ])
+      : [[], []]
+
   return (
     <SidebarProvider>
-      <AppSidebar userRole={profile?.role ?? null} />
+      <AppSidebar
+        userRole={profile?.role ?? null}
+        folders={folders}
+        programs={programs}
+      />
       <SidebarInset>
         <header
           className="sticky top-0 z-50 flex h-14 shrink-0 items-center justify-between border-b border-sidebar-border px-6"

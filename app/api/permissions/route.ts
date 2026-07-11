@@ -1,15 +1,12 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/admin-client"
-import { canManagePermissions, ALL_ACTIONS, type PermAction } from "@/lib/permission-utils"
+import { requireAuth, withErrorHandling } from "@/lib/auth"
+import { canManagePermissions, isFolderLocked, canBypassLock, ALL_ACTIONS, type PermAction } from "@/lib/permission-utils"
 
-export async function POST(request: Request) {
-  try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+export const POST = withErrorHandling(async (request: Request) => {
+  const { user } = await requireAuth()
 
-    const { userId, folderId, documentId, actions } = await request.json()
+  const { userId, folderId, documentId, actions } = await request.json()
 
     if (!userId || (!folderId && !documentId) || !actions || !Array.isArray(actions)) {
       return NextResponse.json(
@@ -18,13 +15,22 @@ export async function POST(request: Request) {
       )
     }
 
+    const adminClient = createAdminClient()
     const resourceId = folderId || documentId
     if (folderId) {
-      const canManage = await canManagePermissions(user.id, folderId)
+      const canManage = await canManagePermissions(adminClient, user.id, folderId)
       if (!canManage) {
         return NextResponse.json(
           { error: "You don't have permission to manage permissions on this folder" },
           { status: 403 },
+        )
+      }
+
+      const locked = await isFolderLocked(adminClient, folderId)
+      if (locked && !(await canBypassLock(adminClient, user.id))) {
+        return NextResponse.json(
+          { error: "Cannot modify permissions on a locked folder" },
+          { status: 423 },
         )
       }
     }
@@ -39,8 +45,6 @@ export async function POST(request: Request) {
         { status: 400 },
       )
     }
-
-    const adminClient = createAdminClient()
 
     const { data: existing } = await adminClient
       .from("permissions")
@@ -123,7 +127,4 @@ export async function POST(request: Request) {
     })
 
     return NextResponse.json({ permission: created }, { status: 201 })
-  } catch {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
-  }
-}
+})

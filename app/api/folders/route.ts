@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/admin-client"
+import { requireAuth, withErrorHandling } from "@/lib/auth"
 import type { Database } from "@/lib/supabase/database.types"
 
 type FolderRow = Database["public"]["Tables"]["folders"]["Row"]
@@ -17,21 +17,10 @@ async function getProgramHeadFolders(programId: string, showArchived: boolean): 
   return results
 }
 
-export async function GET(request: Request) {
-  try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+export const GET = withErrorHandling(async (request: Request) => {
+  const { user, profile } = await requireAuth()
 
-    const { data: profile } = await supabase
-      .from("users")
-      .select("role, program_id")
-      .eq("id", user.id)
-      .single()
-
-    if (!profile) return NextResponse.json({ error: "User profile not found" }, { status: 404 })
-
-    const url = new URL(request.url)
+  const url = new URL(request.url)
     const showArchived = url.searchParams.get("showArchived") === "true"
 
     const adminClient = createAdminClient()
@@ -147,53 +136,31 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.json({ folders })
-  } catch {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
-  }
-}
+})
 
-export async function POST(request: Request) {
-  try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+export const POST = withErrorHandling(async (request: Request) => {
+  const { user, profile } = await requireAuth()
 
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    const { data: profile } = await supabase
-      .from("users")
-      .select("role, program_id")
-      .eq("id", user.id)
-      .single()
-
-    if (!profile) {
-      return NextResponse.json({ error: "User profile not found" }, { status: 404 })
-    }
-
-    const { name, parentId, programId } = await request.json()
+  const { name, parentId, programId } = await request.json()
 
     if (!name || typeof name !== "string" || name.trim().length === 0) {
       return NextResponse.json({ error: "Folder name is required" }, { status: 400 })
     }
 
     const adminClient = createAdminClient()
-    const { isFolderLocked, hasFolderAction } = await import("@/lib/permission-utils")
+    const { isFolderLocked, hasFolderAction, canBypassLock } = await import("@/lib/permission-utils")
 
     let parentLocked = false
     if (parentId) {
-      const locked = await isFolderLocked(parentId)
+      const locked = await isFolderLocked(adminClient, parentId)
       parentLocked = locked
       if (locked) {
-        const { canBypassLock } = await import("@/lib/permission-utils")
-        if (!(await canBypassLock(user.id))) {
+        if (!(await canBypassLock(adminClient, user.id))) {
           return NextResponse.json({ error: "Parent folder is locked" }, { status: 403 })
         }
       }
 
-      const canCreate = await hasFolderAction(user.id, parentId, "create")
+      const canCreate = await hasFolderAction(adminClient, user.id, parentId, "create")
       if (!canCreate) {
         return NextResponse.json({ error: "You do not have permission to create subfolders here" }, { status: 403 })
       }
@@ -299,10 +266,4 @@ export async function POST(request: Request) {
       { error: "You do not have permission to create folders" },
       { status: 403 },
     )
-  } catch {
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    )
-  }
-}
+})

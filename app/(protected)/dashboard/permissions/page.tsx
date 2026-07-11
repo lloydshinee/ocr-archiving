@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/admin-client"
 import { redirect } from "next/navigation"
 import { PermissionManager } from "./permission-manager"
+import { getUsers, getSidebarFolders } from "@/lib/data-fetching"
 
 export default async function PermissionsPage() {
   const supabase = await createClient()
@@ -24,5 +26,23 @@ export default async function PermissionsPage() {
     )
   }
 
-  return <PermissionManager />
+  const adminClient = createAdminClient()
+  const [users, folders] = await Promise.all([
+    getUsers(adminClient, user.id, {
+      role: profile.role,
+      program_id: profile.program_id,
+    }),
+    getSidebarFolders(adminClient, user.id, {
+      role: profile.role,
+      program_id: profile.program_id,
+    }),
+  ])
+
+  return (
+    <PermissionManager
+      initialUsers={users}
+      initialFolders={folders}
+      currentUserRole={profile.role}
+    />
+  )
 }

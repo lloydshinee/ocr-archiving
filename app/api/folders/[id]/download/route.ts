@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/admin-client"
+import { requireAuth, withErrorHandling } from "@/lib/auth"
 import { hasFolderAction } from "@/lib/permission-utils"
 
 async function createArchiver() {
@@ -8,21 +8,18 @@ async function createArchiver() {
   return new mod.ZipArchive({ zlib: { level: 6 } })
 }
 
-export async function GET(
+export const GET = withErrorHandling(async (
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
-) {
-  try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+) => {
+  const { user } = await requireAuth()
 
-    const { id } = await params
+  const { id } = await params
 
-    const canView = await hasFolderAction(user.id, id, "view")
-    if (!canView) return NextResponse.json({ error: "Access denied" }, { status: 403 })
+  const adminClient = createAdminClient()
 
-    const adminClient = createAdminClient()
+  const canView = await hasFolderAction(adminClient, user.id, id, "view")
+  if (!canView) return NextResponse.json({ error: "Access denied" }, { status: 403 })
 
     const { data: folder } = await adminClient
       .from("folders")
@@ -74,17 +71,14 @@ export async function GET(
 
     const safeName = folder.name.replace(/[^a-zA-Z0-9_-]/g, "_")
 
-    return new Response(readable, {
+    return new NextResponse(readable, {
       status: 200,
       headers: {
         "Content-Type": "application/zip",
         "Content-Disposition": `attachment; filename="${safeName}.zip"`,
       },
     })
-  } catch {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
-  }
-}
+})
 
 async function collectDocuments(
   adminClient: ReturnType<typeof createAdminClient>,

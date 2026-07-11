@@ -76,7 +76,6 @@ export function MoveDialog({
       })
       if (!res.ok) { const d = await res.json(); throw new Error(d.error ?? "Failed to move") }
       toast.success(`"${itemName}" moved`)
-      window.dispatchEvent(new CustomEvent("refresh-sidebar"))
       setOpen(false); setTargetId(""); router.refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong")

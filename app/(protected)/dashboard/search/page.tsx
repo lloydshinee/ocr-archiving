@@ -39,7 +39,7 @@ export default async function SearchPage({
     }) as { data: SearchResultItem[] | null }
 
     if (data) {
-      results = await filterSearchResults(data, user.id)
+      results = await filterSearchResults(adminClient, data, user.id)
       total = results.length
     }
   }
