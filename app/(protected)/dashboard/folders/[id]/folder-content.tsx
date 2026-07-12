@@ -49,6 +49,7 @@ import { OcrViewerButton } from "@/components/ocr-viewer-button"
 import { OcrViewerDialog } from "@/components/ocr-viewer-dialog"
 import { useSelection } from "@/hooks/use-selection"
 import { batchArchive, batchDelete } from "@/lib/batch-operations"
+import { collectEntries, createFolderTree } from "@/lib/directory-upload"
 
 interface Subfolder {
   id: string
@@ -306,37 +307,56 @@ export function FolderContent({
       setIsDragOver(false)
       if (uploading) return
 
-      const files = Array.from(e.dataTransfer?.files ?? [])
-      if (files.length === 0) return
+      const items = e.dataTransfer?.items
+      if (!items || items.length === 0) return
 
       setUploading(true)
-      const toastId = toast.loading(`Uploading ${files.length} file${files.length !== 1 ? "s" : ""}...`)
+      const toastId = toast.loading("Processing drop...")
 
       try {
-        const formData = new FormData()
-        formData.append("folderId", folderId)
-        for (const file of files) {
-          formData.append("files", file)
+        const entries = await collectEntries(items)
+
+        if (entries.length === 0) {
+          toast.error("No files found", { id: toastId })
+          return
         }
 
-        const res = await fetch("/api/documents/bulk", {
-          method: "POST",
-          body: formData,
-        })
+        const hasFolders = entries.some((e) => e.relativePath.length > 0)
 
-        const data = await res.json()
-        const count = data.documents?.length ?? 0
-        const errCount = data.errors?.length ?? 0
-
-        if (errCount > 0) {
-          toast.success(`Uploaded ${count} file${count !== 1 ? "s" : ""}, ${errCount} skipped`, { id: toastId })
+        if (hasFolders) {
+          await createFolderTree(entries, folderId, (msg) => {
+            toast.loading(msg, { id: toastId })
+          })
+          toast.success("Folder structure created and files uploaded", { id: toastId })
         } else {
-          toast.success(`Uploaded ${count} file${count !== 1 ? "s" : ""}`, { id: toastId })
+          const files = entries.map((e) => e.file)
+          toast.loading(`Uploading ${files.length} file${files.length !== 1 ? "s" : ""}...`, { id: toastId })
+
+          const formData = new FormData()
+          formData.append("folderId", folderId)
+          for (const file of files) {
+            formData.append("files", file)
+          }
+
+          const res = await fetch("/api/documents/bulk", {
+            method: "POST",
+            body: formData,
+          })
+
+          const data = await res.json()
+          const count = data.documents?.length ?? 0
+          const errCount = data.errors?.length ?? 0
+
+          if (errCount > 0) {
+            toast.success(`Uploaded ${count} file${count !== 1 ? "s" : ""}, ${errCount} skipped`, { id: toastId })
+          } else {
+            toast.success(`Uploaded ${count} file${count !== 1 ? "s" : ""}`, { id: toastId })
+          }
         }
 
         router.refresh()
-      } catch {
-        toast.error("Upload failed", { id: toastId })
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Upload failed", { id: toastId })
       } finally {
         setUploading(false)
       }
