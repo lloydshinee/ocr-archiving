@@ -17,7 +17,7 @@ import {
   CheckIcon,
 } from "lucide-react"
 import { fileTypeIcon } from "@/lib/file-icons"
-import { FILE_TYPE_LABELS } from "@/lib/constants"
+import { FILE_TYPE_LABELS, TEXT_EXTRACTABLE_TYPES } from "@/lib/constants"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -45,6 +45,8 @@ import { DocumentViewer } from "@/components/document-viewer"
 import { MoveDialog } from "@/components/move-dialog"
 import { BatchActionsToolbar } from "@/components/batch-actions-toolbar"
 import { DragUploadOverlay } from "@/components/drag-upload-overlay"
+import { OcrViewerButton } from "@/components/ocr-viewer-button"
+import { OcrViewerDialog } from "@/components/ocr-viewer-dialog"
 import { useSelection } from "@/hooks/use-selection"
 import { batchArchive, batchDelete } from "@/lib/batch-operations"
 
@@ -86,6 +88,7 @@ interface FolderContentProps {
   canMove: boolean
   canCreate: boolean
   isLocked: boolean
+  documentOcrStatus: Map<string, string>
 }
 
 export function FolderContent({
@@ -105,6 +108,7 @@ export function FolderContent({
   canMove,
   canCreate,
   isLocked,
+  documentOcrStatus,
 }: FolderContentProps) {
   const router = useRouter()
   const [loadingId, setLoadingId] = useState<string | null>(null)
@@ -645,6 +649,13 @@ export function FolderContent({
                             <Badge variant="outline" className="text-[10px] shrink-0">
                               {docCategoryNames.get(doc.category_id)}
                             </Badge>
+                          )}
+                          {TEXT_EXTRACTABLE_TYPES.includes(doc.file_type) && documentOcrStatus.get(doc.id) === "completed" && (
+                            <OcrViewerButton
+                              documentId={doc.id}
+                              title={doc.title}
+                              status="completed"
+                            />
                           )}
                         </div>
                         <div className="mt-0.5 flex items-center gap-3 text-[11px] text-muted-foreground/50">

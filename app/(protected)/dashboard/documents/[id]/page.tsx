@@ -16,6 +16,7 @@ import { DocumentActions } from "./document-actions";
 import { VersionActions } from "@/components/version-actions";
 import { hasDocumentAction, getUserProfile, isFolderLocked } from "@/lib/permission-utils";
 import { OcrStatusBadge } from "@/components/ocr-status-badge";
+import { OcrViewerButton } from "@/components/ocr-viewer-button";
 import { isOcrEligible } from "@/lib/search-utils";
 import { getFolderBreadcrumbsFromDb } from "@/lib/folder-utils";
 
@@ -177,12 +178,18 @@ export default async function DocumentPage({
               Archived
             </span>
           )}
-          {currentVersion && isOcrEligible(doc.file_type) && (
+          {currentVersion && isOcrEligible(doc.file_type) && currentVersion.ocr_status === "completed" ? (
+            <OcrViewerButton
+              documentId={doc.id}
+              title={doc.title}
+              status={currentVersion.ocr_status}
+            />
+          ) : currentVersion && isOcrEligible(doc.file_type) ? (
             <OcrStatusBadge
               status={currentVersion.ocr_status}
               versionId={currentVersion.id}
             />
-          )}
+          ) : null}
         </div>
       </div>
 

@@ -136,6 +136,27 @@ export default async function FolderPage({
     }
   }
 
+  const documentOcrStatus = new Map<string, string>()
+  if (documents && documents.length > 0) {
+    const versionIds = documents.map((d) => d.current_version_id).filter(Boolean) as string[]
+    if (versionIds.length > 0) {
+      const { data: versions } = await adminClient
+        .from("document_versions")
+        .select("id, ocr_status")
+        .in("id", versionIds)
+
+      if (versions) {
+        const ocrByVersion = new Map(versions.map((v) => [v.id, v.ocr_status]))
+        for (const doc of documents) {
+          if (doc.current_version_id) {
+            const status = ocrByVersion.get(doc.current_version_id)
+            if (status) documentOcrStatus.set(doc.id, status)
+          }
+        }
+      }
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <FolderBreadcrumb items={breadcrumbs} />
@@ -237,6 +258,7 @@ export default async function FolderPage({
             canDelete={await hasFolderAction(adminClient, user.id, folder.id, "delete")}
             canMove={await hasFolderAction(adminClient, user.id, folder.id, "move")}
             isLocked={isLocked}
+            documentOcrStatus={documentOcrStatus}
           />
         }
         permissionsTab={

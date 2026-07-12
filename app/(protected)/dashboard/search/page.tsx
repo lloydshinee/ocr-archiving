@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge"
 import { createAdminClient } from "@/lib/admin-client"
 import { createClient } from "@/lib/supabase/server"
 import { OcrStatusBadge } from "@/components/ocr-status-badge"
+import { OcrViewerButton } from "@/components/ocr-viewer-button"
 import { filterSearchResults, isOcrEligible, type SearchResultItem } from "@/lib/search-utils"
 import Link from "next/link"
 
@@ -222,9 +223,15 @@ function ResultCard({ result }: { result: SearchResultItem }) {
             <Badge variant="outline" className="text-[10px] shrink-0">
               {isFolder ? "Folder" : fileTypeLabel(result.file_type ?? "")}
             </Badge>
-            {!isFolder && result.ocr_status && isOcrEligible(result.file_type) && (
+            {!isFolder && result.ocr_status === "completed" && isOcrEligible(result.file_type) ? (
+              <OcrViewerButton
+                documentId={result.id}
+                title={result.title}
+                status={result.ocr_status}
+              />
+            ) : !isFolder && result.ocr_status && isOcrEligible(result.file_type) ? (
               <OcrStatusBadge status={result.ocr_status} />
-            )}
+            ) : null}
           </div>
 
           {result.match_headline && (
