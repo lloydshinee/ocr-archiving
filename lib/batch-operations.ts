@@ -53,33 +53,3 @@ export async function batchDelete(items: BatchItem[]) {
     toast.success(`${succeeded} moved to Bin, ${failed} failed`)
   }
 }
-
-export async function batchMove(items: BatchItem[], targetId: string | null) {
-  const results = await Promise.allSettled(
-    items.map((item) =>
-      fetch(
-        item.type === "folder"
-          ? `/api/folders/${item.id}`
-          : `/api/documents/${item.id}`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(
-            item.type === "folder"
-              ? { parentId: targetId }
-              : { folderId: targetId },
-          ),
-        },
-      ),
-    ),
-  )
-
-  const succeeded = results.filter((r) => r.status === "fulfilled" && (r.value as Response).ok).length
-  const failed = results.length - succeeded
-
-  if (failed === 0) {
-    toast.success(`${succeeded} item${succeeded !== 1 ? "s" : ""} moved`)
-  } else {
-    toast.success(`${succeeded} moved, ${failed} failed`)
-  }
-}

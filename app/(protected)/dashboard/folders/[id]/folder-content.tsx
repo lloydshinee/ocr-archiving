@@ -487,7 +487,7 @@ export function FolderContent({
               <div className="flex items-center gap-1.5 px-5 py-2 border-b bg-muted/20">
                 <Checkbox
                   checked={sel.allSelected}
-                  onCheckedChange={() => sel.toggleAll()}
+                  onClick={() => sel.toggleAll()}
                   className="size-4"
                 />
                 <span className="text-[11px] text-muted-foreground/50 ml-1">
@@ -507,7 +507,7 @@ export function FolderContent({
                       <Checkbox
                         checked={sel.isSelected(sf.id)}
                         disabled={!canSelect(sf.id)}
-                        onCheckedChange={() => sel.toggle(sf.id)}
+                        onClick={(e) => sel.toggle(sf.id, e.shiftKey)}
                         className="size-4 shrink-0"
                       />
                     )}
@@ -624,7 +624,7 @@ export function FolderContent({
                         <Checkbox
                           checked={sel.isSelected(doc.id)}
                           disabled={!canSelect(doc.id)}
-                          onCheckedChange={() => sel.toggle(doc.id)}
+                          onClick={(e) => sel.toggle(doc.id, e.shiftKey)}
                           className="size-4 shrink-0"
                         />
                       )}
