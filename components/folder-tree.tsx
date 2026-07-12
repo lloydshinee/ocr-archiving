@@ -44,21 +44,22 @@ function FolderTreeItem({
     return (
       <Wrapper>
         {isSub ? (
-          <SidebarMenuSubButton
-            isActive={isActive}
-            onClick={() => { router.push(href); setOpenMobile(false) }}
-            className={cn(isArchived && "opacity-50")}
-          >
-            <span className={cn("truncate", isArchived && "italic")}>{folder.name}</span>
-            {isArchived && (
-              <span
-                className="ml-1 shrink-0 text-[9px] text-muted-foreground/50"
-                style={{ fontFamily: "var(--font-mono)" }}
-              >
-                ARCHIVED
-              </span>
-            )}
-          </SidebarMenuSubButton>
+            <SidebarMenuSubButton
+              isActive={isActive}
+              onClick={() => { router.push(href); setOpenMobile(false) }}
+              className={cn(isArchived && "opacity-50")}
+            >
+              <FolderIcon className="size-3.5 shrink-0 text-sidebar-foreground/60" />
+              <span className={cn("truncate", isArchived && "italic")}>{folder.name}</span>
+              {isArchived && (
+                <span
+                  className="ml-1 shrink-0 text-[9px] text-muted-foreground/50"
+                  style={{ fontFamily: "var(--font-mono)" }}
+                >
+                  ARCHIVED
+                </span>
+              )}
+            </SidebarMenuSubButton>
         ) : (
           <SidebarMenuButton
             isActive={isActive}
@@ -94,6 +95,7 @@ function FolderTreeItem({
               onClick={() => { router.push(href); setOpenMobile(false) }}
               className={cn("flex-1", isArchived && "opacity-50")}
             >
+              <FolderIcon className="size-3.5 shrink-0 text-sidebar-foreground/60" />
               <span className={cn("truncate", isArchived && "italic")}>{folder.name}</span>
               {isArchived && (
                 <span
