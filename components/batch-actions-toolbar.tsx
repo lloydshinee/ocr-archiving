@@ -1,6 +1,6 @@
 "use client"
 
-import { ArchiveIcon, Trash2Icon, MoveIcon, XIcon } from "lucide-react"
+import { ArchiveIcon, Trash2Icon, MoveIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 interface BatchActionsToolbarProps {
@@ -8,7 +8,6 @@ interface BatchActionsToolbarProps {
   onArchive: () => void
   onDelete: () => void
   onMove: () => void
-  onCancel: () => void
 }
 
 export function BatchActionsToolbar({
@@ -16,7 +15,6 @@ export function BatchActionsToolbar({
   onArchive,
   onDelete,
   onMove,
-  onCancel,
 }: BatchActionsToolbarProps) {
   return (
     <div className="flex items-center gap-3 px-5 py-2.5 border-b bg-muted/30">
@@ -35,12 +33,6 @@ export function BatchActionsToolbar({
         <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs text-destructive hover:text-destructive" onClick={onDelete}>
           <Trash2Icon className="size-3.5" />
           Delete
-        </Button>
-      </div>
-      <div className="ml-auto">
-        <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs" onClick={onCancel}>
-          <XIcon className="size-3.5" />
-          Cancel
         </Button>
       </div>
     </div>

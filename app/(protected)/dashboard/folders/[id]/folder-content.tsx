@@ -416,7 +416,6 @@ export function FolderContent({
                 onArchive={handleBatchArchive}
                 onDelete={handleBatchDelete}
                 onMove={handleBatchMove}
-                onCancel={sel.exitSelectionMode}
               />
             ) : (
               <div className="flex items-center gap-3 px-5 py-3 border-b">
@@ -440,10 +439,10 @@ export function FolderContent({
                     variant="ghost"
                     size="sm"
                     className="h-7 gap-1.5 text-xs"
-                    onClick={() => sel.setSelectionMode(true)}
+                    onClick={() => sel.selectionMode ? sel.exitSelectionMode() : sel.setSelectionMode(true)}
                   >
                     <CheckIcon className="size-3.5" />
-                    Select
+                    {sel.selectionMode ? "Cancel" : "Select"}
                   </Button>
                 )}
               </div>
