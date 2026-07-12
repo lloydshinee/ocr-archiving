@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import {
   XIcon,
   DownloadIcon,
@@ -177,7 +177,8 @@ function TextViewer({
   error: boolean
   setError: (v: boolean) => void
 }) {
-  if (content === null && !loading && !error) {
+  useEffect(() => {
+    if (content !== null || loading || error) return
     setLoading(true)
     fetch(url)
       .then((r) => {
@@ -192,7 +193,7 @@ function TextViewer({
         setError(true)
         setLoading(false)
       })
-  }
+  }, [url, content, loading, error, setContent, setLoading, setError])
 
   if (loading) {
     return (

@@ -11,9 +11,9 @@ import Link from "next/link"
 export default async function SearchPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; category?: string; type?: string; owner?: string; from?: string; to?: string; format?: string }>
+  searchParams: Promise<{ q?: string; category?: string; type?: string; owner?: string; from?: string; to?: string; format?: string; archived?: string }>
 }) {
-  const { q, category, type, owner, from, to, format } = await searchParams
+  const { q, category, type, owner, from, to, format, archived } = await searchParams
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   const adminClient = createAdminClient()
@@ -21,7 +21,8 @@ export default async function SearchPage({
   const { data: categories } = await adminClient.from("categories").select("id, name").order("name")
   const { data: documentTypes } = await adminClient.from("document_types").select("id, name").order("name")
 
-  const hasFilters = !!(category || type || owner || from || to || format)
+  const showArchived = archived === "true"
+  const hasFilters = !!(category || type || owner || from || to || format || showArchived)
 
   let results: SearchResultItem[] = []
   let total = 0
@@ -35,6 +36,7 @@ export default async function SearchPage({
       p_date_from: from || undefined,
       p_date_to: to || undefined,
       p_file_type: format || undefined,
+      p_include_archived: showArchived,
       p_limit: 150,
       p_offset: 0,
     }) as { data: SearchResultItem[] | null }
@@ -156,6 +158,29 @@ export default async function SearchPage({
               />
             </div>
 
+            <a
+              href={(() => {
+                const p = new URLSearchParams()
+                if (q) p.set("q", q)
+                if (category) p.set("category", category)
+                if (type) p.set("type", type)
+                if (owner) p.set("owner", owner)
+                if (from) p.set("from", from)
+                if (to) p.set("to", to)
+                if (format) p.set("format", format)
+                if (!showArchived) p.set("archived", "true")
+                const qs = p.toString()
+                return `/dashboard/search${qs ? `?${qs}` : ""}`
+              })()}
+              className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs transition-colors ${
+                showArchived
+                  ? "bg-amber-200 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 border-amber-300 dark:border-amber-700"
+                  : "bg-background text-muted-foreground hover:text-foreground border-muted-foreground/20"
+              }`}
+            >
+              <span>{showArchived ? "Hide archived" : "Show archived"}</span>
+            </a>
+
             <button
               type="submit"
               className="rounded-lg border bg-primary px-4 py-2 text-xs text-primary-foreground hover:bg-primary/90 transition-colors"
@@ -165,6 +190,7 @@ export default async function SearchPage({
             </button>
           </div>
         </details>
+        {showArchived && <input type="hidden" name="archived" value="true" />}
       </form>
 
       {q && (
@@ -220,6 +246,11 @@ function ResultCard({ result }: { result: SearchResultItem }) {
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span className="font-medium text-sm truncate">{result.title}</span>
+            {result.is_archived && (
+              <span className="px-1.5 py-0.5 rounded text-[10px] uppercase tracking-[0.12em] bg-amber-200 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 shrink-0">
+                Archived
+              </span>
+            )}
             <Badge variant="outline" className="text-[10px] shrink-0">
               {isFolder ? "Folder" : fileTypeLabel(result.file_type ?? "")}
             </Badge>

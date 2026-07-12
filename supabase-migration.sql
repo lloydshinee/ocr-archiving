@@ -447,14 +447,16 @@ CREATE FUNCTION public.search_archives(
     p_date_to timestamp with time zone DEFAULT NULL::timestamp with time zone,
     p_file_type text DEFAULT NULL::text,
     p_limit integer DEFAULT 50,
-    p_offset integer DEFAULT 0
+    p_offset integer DEFAULT 0,
+    p_include_archived boolean DEFAULT false
 ) RETURNS TABLE(
     id uuid, result_type text, title text, description text,
     folder_id uuid, folder_path text,
     created_at timestamp with time zone, updated_at timestamp with time zone,
     owner_id uuid, owner_name text,
     file_type text, file_size bigint, ocr_status text,
-    match_headline text, rank real
+    match_headline text, rank real,
+    is_archived boolean
 ) LANGUAGE plpgsql STABLE AS $$
 DECLARE
     v_ts_query tsquery;
@@ -471,7 +473,8 @@ BEGIN
             f.owner_id, u.full_name AS owner_name,
             NULL::TEXT AS file_type, NULL::BIGINT AS file_size, NULL::TEXT AS ocr_status,
             ts_headline('english', f.name, v_ts_query, 'StartSel=<mark>, StopSel=</mark>') AS match_headline,
-            ts_rank(f.search_vector, v_ts_query) AS rank
+            ts_rank(f.search_vector, v_ts_query) AS rank,
+            f.is_archived
         FROM folders f
         JOIN users u ON u.id = f.owner_id
         WHERE f.deleted_at IS NULL
@@ -494,12 +497,13 @@ BEGIN
             GREATEST(
                 ts_rank(d.search_vector, v_ts_query),
                 COALESCE(ts_rank(dv.search_vector, v_ts_query), 0)
-            ) AS rank
+            ) AS rank,
+            d.is_archived
         FROM documents d
         JOIN users u ON u.id = d.owner_id
         LEFT JOIN document_versions dv ON dv.id = d.current_version_id
         WHERE d.deleted_at IS NULL
-            AND d.is_archived = false
+            AND (p_include_archived OR d.is_archived = false)
             AND (
                 d.search_vector @@ v_ts_query
                 OR (dv.id IS NOT NULL AND dv.search_vector @@ v_ts_query)

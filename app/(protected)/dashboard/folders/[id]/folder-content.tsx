@@ -384,11 +384,21 @@ export function FolderContent({
 
   const hasItems = subfolders.length > 0 || documents.length > 0
 
+  const archivedFolderCount = subfolders.filter((sf) => sf.is_archived).length
+  const archivedDocCount = documents.filter((d) => d.is_archived).length
+  const totalArchived = archivedFolderCount + archivedDocCount
+
   const countLabel = filterType === "folders"
     ? `${filteredSubfolders.length} folder${filteredSubfolders.length !== 1 ? "s" : ""}`
     : filterType !== "all"
       ? `${filteredDocuments.length} document${filteredDocuments.length !== 1 ? "s" : ""}`
-      : `${subfolders.length} folder${subfolders.length !== 1 ? "s" : ""} \u00B7 ${documents.length} document${documents.length !== 1 ? "s" : ""}`
+      : [
+          `${subfolders.length} folder${subfolders.length !== 1 ? "s" : ""}`,
+          `${documents.length} document${documents.length !== 1 ? "s" : ""}`,
+          totalArchived > 0 ? `${totalArchived} archived` : null,
+        ]
+          .filter(Boolean)
+          .join(" \u00B7 ")
 
   return (
     <>

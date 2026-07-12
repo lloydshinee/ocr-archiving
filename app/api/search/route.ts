@@ -14,6 +14,7 @@ export const GET = withErrorHandling(async (request: Request) => {
   const dateFrom = url.searchParams.get("from") || undefined
   const dateTo = url.searchParams.get("to") || undefined
   const fileType = url.searchParams.get("format") || undefined
+  const includeArchived = url.searchParams.get("archived") === "true"
   const limit = Math.min(parseInt(url.searchParams.get("limit") || "50", 10), 100)
   const offset = parseInt(url.searchParams.get("offset") || "0", 10)
 
@@ -31,6 +32,7 @@ export const GET = withErrorHandling(async (request: Request) => {
     p_date_from: dateFrom || undefined,
     p_date_to: dateTo || undefined,
     p_file_type: fileType,
+    p_include_archived: includeArchived,
     p_limit: limit * 3,
     p_offset: 0,
   }) as { data: SearchResultItem[] | null; error: unknown }

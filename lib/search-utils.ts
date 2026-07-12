@@ -18,6 +18,7 @@ export type SearchResultItem = {
   ocr_status: string | null
   match_headline: string | null
   rank: number
+  is_archived: boolean
 }
 
 export async function filterSearchResults(
