@@ -282,62 +282,62 @@ export function FolderContent({
     }
   }
 
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    if (!canHaveSelection) return
-    e.preventDefault()
-    e.stopPropagation()
-    setIsDragOver(true)
-  }, [canHaveSelection])
-
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setIsDragOver(false)
-  }, [])
-
-  const handleDrop = useCallback(async (e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setIsDragOver(false)
-    if (!canHaveSelection || uploading) return
-
-    const files = Array.from(e.dataTransfer.files)
-    if (files.length === 0) return
-
-    setUploading(true)
-    const toastId = toast.loading(`Uploading ${files.length} file${files.length !== 1 ? "s" : ""}...`)
-
-    try {
-      const formData = new FormData()
-      formData.append("folderId", folderId)
-      for (const file of files) {
-        formData.append("files", file)
-      }
-
-      const res = await fetch("/api/documents/bulk", {
-        method: "POST",
-        body: formData,
-      })
-
-      const data = await res.json()
-      const count = data.documents?.length ?? 0
-      const errCount = data.errors?.length ?? 0
-
-      if (errCount > 0) {
-        toast.success(`Uploaded ${count} file${count !== 1 ? "s" : ""}, ${errCount} skipped`, { id: toastId })
-      } else {
-        toast.success(`Uploaded ${count} file${count !== 1 ? "s" : ""}`, { id: toastId })
-      }
-
-      router.refresh()
-    } catch {
-      toast.error("Upload failed", { id: toastId })
-    } finally {
-      setUploading(false)
-    }
-  }, [canHaveSelection, uploading, folderId, router])
-
   useEffect(() => {
+    if (!canHaveSelection) return
+
+    function onDragOver(e: DragEvent) {
+      e.preventDefault()
+      setIsDragOver(true)
+    }
+
+    function onDragLeave(e: DragEvent) {
+      if (e.clientX <= 0 || e.clientY <= 0 ||
+          e.clientX >= window.innerWidth || e.clientY >= window.innerHeight) {
+        setIsDragOver(false)
+      }
+    }
+
+    async function onDrop(e: DragEvent) {
+      e.preventDefault()
+      setIsDragOver(false)
+      if (uploading) return
+
+      const files = Array.from(e.dataTransfer?.files ?? [])
+      if (files.length === 0) return
+
+      setUploading(true)
+      const toastId = toast.loading(`Uploading ${files.length} file${files.length !== 1 ? "s" : ""}...`)
+
+      try {
+        const formData = new FormData()
+        formData.append("folderId", folderId)
+        for (const file of files) {
+          formData.append("files", file)
+        }
+
+        const res = await fetch("/api/documents/bulk", {
+          method: "POST",
+          body: formData,
+        })
+
+        const data = await res.json()
+        const count = data.documents?.length ?? 0
+        const errCount = data.errors?.length ?? 0
+
+        if (errCount > 0) {
+          toast.success(`Uploaded ${count} file${count !== 1 ? "s" : ""}, ${errCount} skipped`, { id: toastId })
+        } else {
+          toast.success(`Uploaded ${count} file${count !== 1 ? "s" : ""}`, { id: toastId })
+        }
+
+        router.refresh()
+      } catch {
+        toast.error("Upload failed", { id: toastId })
+      } finally {
+        setUploading(false)
+      }
+    }
+
     function handleKeyDown(e: KeyboardEvent) {
       if (!sel.selectionMode) return
       if ((e.ctrlKey || e.metaKey) && e.key === "a") {
@@ -346,9 +346,17 @@ export function FolderContent({
       }
     }
 
+    document.addEventListener("dragover", onDragOver)
+    document.addEventListener("dragleave", onDragLeave)
+    document.addEventListener("drop", onDrop)
     document.addEventListener("keydown", handleKeyDown)
-    return () => document.removeEventListener("keydown", handleKeyDown)
-  }, [sel.selectionMode, sel.toggleAll])
+    return () => {
+      document.removeEventListener("dragover", onDragOver)
+      document.removeEventListener("dragleave", onDragLeave)
+      document.removeEventListener("drop", onDrop)
+      document.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [canHaveSelection, uploading, folderId, router, sel.selectionMode, sel.toggleAll])
 
   const hasItems = subfolders.length > 0 || documents.length > 0
 
@@ -360,12 +368,7 @@ export function FolderContent({
 
   return (
     <>
-      <div
-        className="rounded-xl border bg-card shadow-sm"
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-      >
+      <div className="rounded-xl border bg-card shadow-sm">
         <DragUploadOverlay visible={isDragOver && !uploading} />
 
         {!hasItems ? (
