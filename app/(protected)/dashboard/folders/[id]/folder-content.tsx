@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useState, useCallback, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import {
   FolderIcon,
@@ -14,11 +14,14 @@ import {
   FolderOpenIcon,
   MoveIcon,
   LockIcon,
+  CheckIcon,
 } from "lucide-react"
 import { fileTypeIcon } from "@/lib/file-icons"
+import { FILE_TYPE_LABELS } from "@/lib/constants"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,17 +43,10 @@ import { toast } from "sonner"
 import { DocumentDialog } from "@/components/document-dialog"
 import { DocumentViewer } from "@/components/document-viewer"
 import { MoveDialog } from "@/components/move-dialog"
-
-const FILE_TYPE_LABELS: Record<string, string> = {
-  "application/pdf": "PDF",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "DOCX",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "XLSX",
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation": "PPTX",
-  "image/jpeg": "JPEG",
-  "image/png": "PNG",
-  "text/plain": "TXT",
-  "application/zip": "ZIP",
-}
+import { BatchActionsToolbar } from "@/components/batch-actions-toolbar"
+import { DragUploadOverlay } from "@/components/drag-upload-overlay"
+import { useSelection } from "@/hooks/use-selection"
+import { batchArchive, batchDelete } from "@/lib/batch-operations"
 
 interface Subfolder {
   id: string
@@ -88,6 +84,7 @@ interface FolderContentProps {
   canArchive: boolean
   canDelete: boolean
   canMove: boolean
+  canCreate: boolean
   isLocked: boolean
 }
 
@@ -106,6 +103,7 @@ export function FolderContent({
   canArchive,
   canDelete,
   canMove,
+  canCreate,
   isLocked,
 }: FolderContentProps) {
   const router = useRouter()
@@ -119,6 +117,9 @@ export function FolderContent({
     id: string
     name: string
   } | null>(null)
+  const [isDragOver, setIsDragOver] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [batchMoveOpen, setBatchMoveOpen] = useState(false)
 
   const filteredSubfolders = useMemo(() => {
     let items = subfolders
@@ -148,10 +149,57 @@ export function FolderContent({
     return result
   }, [documents, search, filterType, showArchived])
 
+  const allVisibleIds = useMemo(
+    () => [...filteredSubfolders.map((sf) => sf.id), ...filteredDocuments.map((d) => d.id)],
+    [filteredSubfolders, filteredDocuments],
+  )
+
+  const sel = useSelection(allVisibleIds)
+
+  const canHaveSelection = canCreate && !isLocked
+
   function canEditDoc(ownerId: string) {
     if (userRole === "dean") return true
     if (userRole === "program_head" && folderProgramId) return true
     return ownerId === currentUserId
+  }
+
+  function isLockedItem(id: string) {
+    return subfolders.some((sf) => sf.id === id && sf.is_locked)
+  }
+
+  function canSelect(id: string) {
+    if (userRole === "dean" || userRole === "program_head") return true
+    return !isLockedItem(id)
+  }
+
+  const getSelectedItems = useCallback(() => {
+    const items: { type: "folder" | "document"; id: string; name: string }[] = []
+    for (const id of sel.selectedIds) {
+      const sf = subfolders.find((f) => f.id === id)
+      if (sf) items.push({ type: "folder", id: sf.id, name: sf.name })
+      const doc = documents.find((d) => d.id === id)
+      if (doc) items.push({ type: "document", id: doc.id, name: doc.title })
+    }
+    return items
+  }, [sel.selectedIds, subfolders, documents])
+
+  const handleBatchArchive = async () => {
+    const items = getSelectedItems()
+    await batchArchive(items, false)
+    sel.exitSelectionMode()
+    router.refresh()
+  }
+
+  const handleBatchDelete = async () => {
+    const items = getSelectedItems()
+    await batchDelete(items)
+    sel.exitSelectionMode()
+    router.refresh()
+  }
+
+  const handleBatchMove = () => {
+    setBatchMoveOpen(true)
   }
 
   const handleArchiveDoc = async (docId: string, currentlyArchived: boolean) => {
@@ -234,6 +282,74 @@ export function FolderContent({
     }
   }
 
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    if (!canHaveSelection) return
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(true)
+  }, [canHaveSelection])
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(false)
+  }, [])
+
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(false)
+    if (!canHaveSelection || uploading) return
+
+    const files = Array.from(e.dataTransfer.files)
+    if (files.length === 0) return
+
+    setUploading(true)
+    const toastId = toast.loading(`Uploading ${files.length} file${files.length !== 1 ? "s" : ""}...`)
+
+    try {
+      const formData = new FormData()
+      formData.append("folderId", folderId)
+      for (const file of files) {
+        formData.append("files", file)
+      }
+
+      const res = await fetch("/api/documents/bulk", {
+        method: "POST",
+        body: formData,
+      })
+
+      const data = await res.json()
+      const count = data.documents?.length ?? 0
+      const errCount = data.errors?.length ?? 0
+
+      if (errCount > 0) {
+        toast.success(`Uploaded ${count} file${count !== 1 ? "s" : ""}, ${errCount} skipped`, { id: toastId })
+      } else {
+        toast.success(`Uploaded ${count} file${count !== 1 ? "s" : ""}`, { id: toastId })
+      }
+
+      router.refresh()
+    } catch {
+      toast.error("Upload failed", { id: toastId })
+    } finally {
+      setUploading(false)
+    }
+  }, [canHaveSelection, uploading, folderId, router])
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (!sel.selectionMode) return
+      if ((e.ctrlKey || e.metaKey) && e.key === "a") {
+        e.preventDefault()
+        sel.toggleAll()
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown)
+    return () => document.removeEventListener("keydown", handleKeyDown)
+  }, [sel.selectionMode, sel.toggleAll])
+
   const hasItems = subfolders.length > 0 || documents.length > 0
 
   const countLabel = filterType === "folders"
@@ -244,7 +360,14 @@ export function FolderContent({
 
   return (
     <>
-      <div className="rounded-xl border bg-card shadow-sm">
+      <div
+        className="rounded-xl border bg-card shadow-sm"
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        <DragUploadOverlay visible={isDragOver && !uploading} />
+
         {!hasItems ? (
           <div className="flex flex-col items-center gap-3 py-16">
             <FileTextIcon className="size-8 text-muted-foreground/30" />
@@ -260,25 +383,46 @@ export function FolderContent({
           </div>
         ) : (
           <>
-            <div className="flex items-center gap-3 px-5 py-3 border-b">
-              <div className="relative flex-1">
-                <SearchIcon className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground/40" />
-                <Input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search..."
-                  className="h-8 pl-8 pr-3 text-xs border-0 bg-muted/50 focus-visible:bg-muted rounded-md"
-                />
+            {sel.selectionMode && sel.selectedCount > 0 ? (
+              <BatchActionsToolbar
+                selectedCount={sel.selectedCount}
+                onArchive={handleBatchArchive}
+                onDelete={handleBatchDelete}
+                onMove={handleBatchMove}
+                onCancel={sel.exitSelectionMode}
+              />
+            ) : (
+              <div className="flex items-center gap-3 px-5 py-3 border-b">
+                <div className="relative flex-1">
+                  <SearchIcon className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground/40" />
+                  <Input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search..."
+                    className="h-8 pl-8 pr-3 text-xs border-0 bg-muted/50 focus-visible:bg-muted rounded-md"
+                  />
+                </div>
+                <span
+                  className="text-[11px] text-muted-foreground/50 shrink-0"
+                  style={{ fontFamily: "var(--font-mono)" }}
+                >
+                  {countLabel}
+                </span>
+                {canHaveSelection && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 gap-1.5 text-xs"
+                    onClick={() => sel.setSelectionMode(true)}
+                  >
+                    <CheckIcon className="size-3.5" />
+                    Select
+                  </Button>
+                )}
               </div>
-              <span
-                className="text-[11px] text-muted-foreground/50 shrink-0"
-                style={{ fontFamily: "var(--font-mono)" }}
-              >
-                {countLabel}
-              </span>
-            </div>
+            )}
 
-            {(subfolders.length > 0 || fileTypes.length > 0) && (
+            {(subfolders.length > 0 || fileTypes.length > 0) && !sel.selectionMode && (
               <div className="flex items-center gap-1.5 px-5 py-2.5 border-b bg-muted/20">
                 {fileTypes.length > 0 && (
                   <button
@@ -332,36 +476,60 @@ export function FolderContent({
               </div>
             )}
 
+            {sel.selectionMode && (
+              <div className="flex items-center gap-1.5 px-5 py-2 border-b bg-muted/20">
+                <Checkbox
+                  checked={sel.allSelected}
+                  onCheckedChange={() => sel.toggleAll()}
+                  className="size-4"
+                />
+                <span className="text-[11px] text-muted-foreground/50 ml-1">
+                  {sel.allSelected ? `${allVisibleIds.length} selected` : "Select all"}
+                </span>
+              </div>
+            )}
+
             <div className="divide-y">
               {filteredSubfolders.map((sf) => (
                 <div
                   key={sf.id}
                   className="flex flex-wrap items-center justify-between gap-4 px-5 py-3.5 hover:bg-muted/50 transition-colors"
                 >
-                  <a
-                    href={`/dashboard/folders/${sf.id}`}
-                    className="flex items-center gap-3 min-w-0 flex-1"
-                  >
-                    <FolderIcon className="size-4 shrink-0 text-primary" />
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="truncate text-sm">{sf.name}</span>
-                        {sf.is_locked && (
-                          <LockIcon className="size-3 shrink-0 text-rose-500" />
-                        )}
-                        {sf.is_archived && (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] uppercase tracking-[0.12em] bg-amber-200 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
-                            Archived
-                          </span>
-                        )}
-                        {sf.category_id && subfolderCategoryNames.has(sf.category_id) && (
-                          <Badge variant="outline" className="text-[10px] shrink-0">
-                            {subfolderCategoryNames.get(sf.category_id)}
-                          </Badge>
-                        )}
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    {sel.selectionMode && (
+                      <Checkbox
+                        checked={sel.isSelected(sf.id)}
+                        disabled={!canSelect(sf.id)}
+                        onCheckedChange={() => sel.toggle(sf.id)}
+                        className="size-4 shrink-0"
+                      />
+                    )}
+                    <a
+                      href={`/dashboard/folders/${sf.id}`}
+                      className="flex items-center gap-3 min-w-0 flex-1"
+                      onClick={(e) => { if (sel.selectionMode) e.preventDefault() }}
+                    >
+                      <FolderIcon className="size-4 shrink-0 text-primary" />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="truncate text-sm">{sf.name}</span>
+                          {sf.is_locked && (
+                            <LockIcon className="size-3 shrink-0 text-rose-500" />
+                          )}
+                          {sf.is_archived && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] uppercase tracking-[0.12em] bg-amber-200 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
+                              Archived
+                            </span>
+                          )}
+                          {sf.category_id && subfolderCategoryNames.has(sf.category_id) && (
+                            <Badge variant="outline" className="text-[10px] shrink-0">
+                              {subfolderCategoryNames.get(sf.category_id)}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </a>
+                    </a>
+                  </div>
                   <div className="flex items-center gap-3 shrink-0">
                     <span
                       className="text-[11px] text-muted-foreground/50"
@@ -372,7 +540,7 @@ export function FolderContent({
                         day: "numeric",
                       })}
                     </span>
-                    {(canArchive || canDelete) && !isLocked && (
+                    {(canArchive || canDelete) && !isLocked && !sel.selectionMode && (
                       <DropdownMenu>
                         <DropdownMenuTrigger
                           render={
@@ -390,7 +558,7 @@ export function FolderContent({
                           {canMove && !isLocked && (
                             <MoveDialog
                               type="folder"
-                              itemId={sf.id}
+                              itemIds={[sf.id]}
                               currentParentId={folderId}
                               itemName={sf.name}
                               canMoveToRoot={userRole === "dean" || userRole === "program_head"}
@@ -444,42 +612,53 @@ export function FolderContent({
                     key={doc.id}
                     className="flex flex-wrap items-center justify-between gap-4 px-5 py-3.5 hover:bg-muted/50 transition-colors"
                   >
-                    <a
-                      href={`/dashboard/documents/${doc.id}`}
-                      className="flex items-center gap-3 min-w-0 flex-1"
-                    >
-                      {fileTypeIcon(doc.file_type)}
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="truncate text-sm">{doc.title}</span>
-                        {doc.is_archived && (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] uppercase tracking-[0.12em] bg-amber-200 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
-                            Archived
-                          </span>
-                        )}
-                        <Badge variant="outline" className="text-[10px] shrink-0">
-                          {versionCounts.get(doc.id) ?? 1} version{(versionCounts.get(doc.id) ?? 1) !== 1 ? "s" : ""}
-                        </Badge>
-                        {doc.category_id && docCategoryNames.has(doc.category_id) && (
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      {sel.selectionMode && (
+                        <Checkbox
+                          checked={sel.isSelected(doc.id)}
+                          disabled={!canSelect(doc.id)}
+                          onCheckedChange={() => sel.toggle(doc.id)}
+                          className="size-4 shrink-0"
+                        />
+                      )}
+                      <a
+                        href={`/dashboard/documents/${doc.id}`}
+                        className="flex items-center gap-3 min-w-0 flex-1"
+                        onClick={(e) => { if (sel.selectionMode) e.preventDefault() }}
+                      >
+                        {fileTypeIcon(doc.file_type)}
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="truncate text-sm">{doc.title}</span>
+                          {doc.is_archived && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] uppercase tracking-[0.12em] bg-amber-200 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
+                              Archived
+                            </span>
+                          )}
                           <Badge variant="outline" className="text-[10px] shrink-0">
-                            {docCategoryNames.get(doc.category_id)}
+                            {versionCounts.get(doc.id) ?? 1} version{(versionCounts.get(doc.id) ?? 1) !== 1 ? "s" : ""}
                           </Badge>
-                        )}
-                      </div>
-                      <div className="mt-0.5 flex items-center gap-3 text-[11px] text-muted-foreground/50">
-                        <span>{documentOwners.get(doc.owner_id) ?? "Unknown"}</span>
-                          <span style={{ fontFamily: "var(--font-mono)" }}>
-                            {new Date(doc.created_at).toLocaleDateString("en-US", {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            })}
-                          </span>
+                          {doc.category_id && docCategoryNames.has(doc.category_id) && (
+                            <Badge variant="outline" className="text-[10px] shrink-0">
+                              {docCategoryNames.get(doc.category_id)}
+                            </Badge>
+                          )}
                         </div>
-                      </div>
-                    </a>
+                        <div className="mt-0.5 flex items-center gap-3 text-[11px] text-muted-foreground/50">
+                          <span>{documentOwners.get(doc.owner_id) ?? "Unknown"}</span>
+                            <span style={{ fontFamily: "var(--font-mono)" }}>
+                              {new Date(doc.created_at).toLocaleDateString("en-US", {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              })}
+                            </span>
+                          </div>
+                        </div>
+                      </a>
+                    </div>
                     <div className="flex items-center gap-1 shrink-0">
-                      {(canEditDoc(doc.owner_id) && !isLocked) && (
+                      {(canEditDoc(doc.owner_id) && !isLocked) && !sel.selectionMode && (
                         <DocumentDialog
                           mode="edit"
                           folderId={folderId}
@@ -499,7 +678,7 @@ export function FolderContent({
                           }
                         />
                       )}
-                      {!isLocked && (
+                      {!isLocked && !sel.selectionMode && (
                       <DropdownMenu>
                         <DropdownMenuTrigger
                           render={
@@ -529,7 +708,7 @@ export function FolderContent({
                           {canMove && !isLocked && (
                             <MoveDialog
                               type="document"
-                              itemId={doc.id}
+                              itemIds={[doc.id]}
                               currentParentId={folderId}
                               itemName={doc.title}
                               nativeButton={false}
@@ -581,6 +760,16 @@ export function FolderContent({
           </>
         )}
       </div>
+
+      {batchMoveOpen && (
+        <MoveDialog
+          type={subfolders.some((sf) => sel.selectedIds.has(sf.id)) ? "folder" : "document"}
+          itemIds={getSelectedItems().map((i) => i.id)}
+          itemName={`${sel.selectedCount} items`}
+          open={batchMoveOpen}
+          onOpenChange={(v) => { setBatchMoveOpen(v); if (!v) sel.exitSelectionMode() }}
+        />
+      )}
 
       {viewingDoc && (
         <DocumentViewer

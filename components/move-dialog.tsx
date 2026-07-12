@@ -15,20 +15,24 @@ const ROOT = "__root__"
 
 interface MoveDialogProps {
   type: "folder" | "document"
-  itemId: string
-  currentParentId: string | null
+  itemIds: string[]
   itemName: string
+  currentParentId?: string | null
   trigger?: React.ReactElement
   disabled?: boolean
   canMoveToRoot?: boolean
   nativeButton?: boolean
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 export function MoveDialog({
-  type, itemId, currentParentId, itemName, trigger, disabled, canMoveToRoot, nativeButton,
+  type, itemIds, currentParentId, itemName, trigger, disabled, canMoveToRoot, nativeButton, open: controlledOpen, onOpenChange,
 }: MoveDialogProps) {
   const router = useRouter()
-  const [open, setOpen] = useState(false)
+  const [internalOpen, setInternalOpen] = useState(false)
+  const open = controlledOpen ?? internalOpen
+  const setOpen = onOpenChange ?? setInternalOpen
   const [moving, setMoving] = useState(false)
   const [folders, setFolders] = useState<{ id: string; name: string; parent_id: string | null }[]>([])
   const [targetId, setTargetId] = useState("")
@@ -58,11 +62,13 @@ export function MoveDialog({
     const ids = new Set<string>()
     if (currentParentId && currentParentId !== ROOT) ids.add(currentParentId)
     if (type !== "folder") return Array.from(ids)
-    ids.add(itemId)
-    const walk = (pid: string) => { for (const f of folders) if (f.parent_id === pid) { ids.add(f.id); walk(f.id) } }
-    walk(itemId)
+    for (const id of itemIds) {
+      ids.add(id)
+      const walk = (pid: string) => { for (const f of folders) if (f.parent_id === pid) { ids.add(f.id); walk(f.id) } }
+      walk(id)
+    }
     return Array.from(ids)
-  }, [type, itemId, currentParentId, folders])
+  }, [type, itemIds, currentParentId, folders])
 
   const isRoot = targetId === ROOT
 
@@ -70,12 +76,21 @@ export function MoveDialog({
     if (!targetId) { setError("Please select a destination"); return }
     setMoving(true); setError(null)
     try {
-      const body = type === "folder" ? { parentId: isRoot ? null : targetId } : { folderId: targetId }
-      const res = await fetch(`/api/${type === "folder" ? "folders" : "documents"}/${itemId}`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
-      })
-      if (!res.ok) { const d = await res.json(); throw new Error(d.error ?? "Failed to move") }
-      toast.success(`"${itemName}" moved`)
+      let succeeded = 0
+      let failed = 0
+      for (const id of itemIds) {
+        const body = type === "folder" ? { parentId: isRoot ? null : targetId } : { folderId: targetId }
+        const res = await fetch(`/api/${type === "folder" ? "folders" : "documents"}/${id}`, {
+          method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+        })
+        if (res.ok) succeeded++
+        else failed++
+      }
+      if (failed === 0) {
+        toast.success(`${succeeded} item${succeeded !== 1 ? "s" : ""} moved`)
+      } else {
+        toast.success(`${succeeded} moved, ${failed} failed`)
+      }
       setOpen(false); setTargetId(""); router.refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong")

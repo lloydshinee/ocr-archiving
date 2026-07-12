@@ -14,8 +14,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
-
-const ACCEPTED_EXTENSIONS = ".pdf,.docx,.xlsx,.pptx,.jpg,.jpeg,.png,.txt,.zip"
+import { ACCEPTED_EXTENSIONS } from "@/lib/constants"
 
 interface ExistingDocument {
   id: string

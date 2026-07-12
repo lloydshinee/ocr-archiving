@@ -76,7 +76,7 @@ export function DocumentActions({
       {canMove && !isLocked && (
         <MoveDialog
           type="document"
-          itemId={documentId}
+          itemIds={[documentId]}
           currentParentId={currentFolderId ?? null}
           itemName={documentTitle}
           trigger={

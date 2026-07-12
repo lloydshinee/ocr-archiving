@@ -232,6 +232,7 @@ export default async function FolderPage({
             currentUserId={user.id}
             userRole={profile?.role ?? ""}
             folderProgramId={folder.program_id}
+            canCreate={canCreate}
             canArchive={await hasFolderAction(adminClient, user.id, folder.id, "archive")}
             canDelete={await hasFolderAction(adminClient, user.id, folder.id, "delete")}
             canMove={await hasFolderAction(adminClient, user.id, folder.id, "move")}

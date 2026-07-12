@@ -296,7 +296,7 @@ export function FolderActions({
       {canMove && !isProgramRoot && (
         <MoveDialog
           type="folder"
-          itemId={folderId}
+          itemIds={[folderId]}
           currentParentId={parentId}
           itemName={folderName}
           disabled={isLocked}
