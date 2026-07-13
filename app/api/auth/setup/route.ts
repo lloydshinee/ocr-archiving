@@ -57,16 +57,15 @@ export async function POST(request: Request) {
       )
     }
 
-    const { error: insertError } = await adminClient
+    const { error: updateError } = await adminClient
       .from("users")
-      .insert({
-        id: authUser.user.id,
-        email,
+      .update({
         role: "dean",
         full_name: fullName,
       })
+      .eq("id", authUser.user.id)
 
-    if (insertError) {
+    if (updateError) {
       return NextResponse.json(
         { error: "Failed to assign Dean role." },
         { status: 500 },
