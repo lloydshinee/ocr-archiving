@@ -217,133 +217,128 @@ export function SmartDropZone() {
 
       <Dialog open={showDialog} onOpenChange={(v) => { if (!v) handleDialogClose() }}>
         <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {uploadedDoc
+                ? "Uploaded successfully"
+                : analyzing
+                  ? "Analyzing file..."
+                  : "Where should this go?"}
+            </DialogTitle>
+            <DialogDescription>
+              {uploadedDoc?.title ?? droppedFile?.name}
+            </DialogDescription>
+          </DialogHeader>
+
           {uploadedDoc ? (
-            <>
-              <DialogHeader>
-                <DialogTitle>Uploaded successfully</DialogTitle>
-              </DialogHeader>
-              <div className="flex flex-col gap-4 py-2">
-                <div className="flex items-center gap-3 rounded-lg border bg-muted/20 px-4 py-3">
-                  <CheckCircleIcon className="size-5 shrink-0 text-green-500" />
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{uploadedDoc.title}</p>
-                    <p className="text-[11px] text-muted-foreground/60">
-                      {droppedFile && (droppedFile.size / 1024).toFixed(1)} KB
-                    </p>
-                  </div>
-                </div>
-
-                {TEXT_EXTRACTABLE_TYPES.includes(uploadedDoc.fileType) && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] text-muted-foreground/70">Text extraction:</span>
-                    {ocrStatus === "completed" ? (
-                      <OcrViewerButton documentId={uploadedDoc.id} title={uploadedDoc.title} status="completed" />
-                    ) : (
-                      <OcrStatusBadge status={ocrStatus ?? "pending"} versionId={uploadedDoc.versionId || undefined} />
-                    )}
-                  </div>
-                )}
-
-                <div className="flex justify-end gap-2 pt-2">
-                  <Button size="sm" onClick={handleFinish}>
-                    Done
-                  </Button>
-                </div>
-              </div>
-            </>
-          ) : (
-            <>
-              <DialogHeader>
-                <DialogTitle>
-                  {analyzing ? "Analyzing file..." : "Where should this go?"}
-                </DialogTitle>
-                <DialogDescription>
-                  {droppedFile?.name}
-                </DialogDescription>
-              </DialogHeader>
-
-              {analyzing ? (
-                <div className="flex flex-col gap-4 py-6">
-                  <div className="flex items-center gap-3">
-                    <Progress className="flex-1" />
-                  </div>
-                  <p className="text-center text-xs text-muted-foreground">
-                    Extracting content and searching folders...
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center gap-3 rounded-lg border bg-muted/20 px-4 py-3">
+                <CheckCircleIcon className="size-5 shrink-0 text-green-500" />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{uploadedDoc.title}</p>
+                  <p className="text-[11px] text-muted-foreground/60">
+                    {droppedFile && (droppedFile.size / 1024).toFixed(1)} KB
                   </p>
                 </div>
-              ) : (
-                <div className="flex flex-col gap-4">
-                  {timedOut && (
-                    <p className="text-xs text-amber-600 dark:text-amber-400">
-                      Analysis timed out — showing filename-based suggestions
-                    </p>
-                  )}
+              </div>
 
-                  {suggestions.length > 0 ? (
-                    <div className="flex flex-col gap-2">
-                      <p className="text-xs text-muted-foreground uppercase tracking-[0.1em]">
-                        Suggestions
-                      </p>
-                      {suggestions.map((s) => {
-                        const folder = allFolders.find((f) => f.id === s.folderId)
-                        return (
-                          <button
-                            key={s.folderId}
-                            type="button"
-                            onClick={() => setSelectedFolderId(s.folderId)}
-                            className={`flex items-center gap-3 rounded-lg border px-4 py-3 text-left text-sm transition-colors ${
-                              selectedFolderId === s.folderId
-                                ? "border-primary bg-primary/5"
-                                : "border-transparent bg-muted/50 hover:bg-muted"
-                            }`}
-                          >
-                            <FolderIcon className="size-4 shrink-0 text-primary/60" />
-                            <div className="min-w-0 flex-1">
-                              <span className="truncate font-medium">{folder?.name ?? "Unknown folder"}</span>
-                              {folder?.parentPath && (
-                                <span className="ml-2 text-[10px] text-muted-foreground/60">
-                                  {folder.parentPath}
-                                </span>
-                              )}
-                            </div>
-                            <span className="shrink-0 text-[10px] text-muted-foreground/50 font-mono">
-                              {s.score} match{s.score !== 1 ? "es" : ""}
-                            </span>
-                          </button>
-                        )
-                      })}
-                    </div>
+              {TEXT_EXTRACTABLE_TYPES.includes(uploadedDoc.fileType) && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-muted-foreground/70">Text extraction:</span>
+                  {ocrStatus === "completed" ? (
+                    <OcrViewerButton documentId={uploadedDoc.id} title={uploadedDoc.title} status="completed" />
                   ) : (
-                    <div className="flex flex-col items-center gap-2 py-4">
-                      <SearchIcon className="size-6 text-muted-foreground/40" />
-                      <p className="text-sm text-muted-foreground">No matching folders found</p>
-                      <p className="text-xs text-muted-foreground/50">Choose a destination manually below</p>
-                    </div>
+                    <OcrStatusBadge status={ocrStatus ?? "pending"} versionId={uploadedDoc.versionId || undefined} />
                   )}
-
-                  <div className="flex flex-col gap-2">
-                    <p className="text-xs text-muted-foreground uppercase tracking-[0.1em]">
-                      Or choose manually
-                    </p>
-                    <FolderCombobox
-                      folders={allFolders}
-                      value={selectedFolderId ?? ""}
-                      onChange={(id) => setSelectedFolderId(id)}
-                      placeholder="Search folders..."
-                    />
-                  </div>
-
-                  <div className="flex justify-end gap-2 pt-2">
-                    <Button variant="outline" size="sm" onClick={handleDialogClose}>
-                      Cancel
-                    </Button>
-                    <Button size="sm" onClick={handleUpload} disabled={!selectedFolderId || uploading}>
-                      {uploading ? "Uploading..." : "Upload"}
-                    </Button>
-                  </div>
                 </div>
               )}
-            </>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button size="sm" onClick={handleFinish}>
+                  Done
+                </Button>
+              </div>
+            </div>
+          ) : analyzing ? (
+            <div className="flex flex-col gap-4 py-6">
+              <div className="flex items-center gap-3">
+                <Progress className="flex-1" />
+              </div>
+              <p className="text-center text-xs text-muted-foreground">
+                Extracting content and searching folders...
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-4">
+              {timedOut && (
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                  Analysis timed out — showing filename-based suggestions
+                </p>
+              )}
+
+              {suggestions.length > 0 ? (
+                <div className="flex flex-col gap-2">
+                  <p className="text-xs text-muted-foreground uppercase tracking-[0.1em]">
+                    Suggestions
+                  </p>
+                  {suggestions.map((s) => {
+                    const folder = allFolders.find((f) => f.id === s.folderId)
+                    return (
+                      <button
+                        key={s.folderId}
+                        type="button"
+                        onClick={() => setSelectedFolderId(s.folderId)}
+                        className={`flex items-center gap-3 rounded-lg border px-4 py-3 text-left text-sm transition-colors ${
+                          selectedFolderId === s.folderId
+                            ? "border-primary bg-primary/5"
+                            : "border-transparent bg-muted/50 hover:bg-muted"
+                        }`}
+                      >
+                        <FolderIcon className="size-4 shrink-0 text-primary/60" />
+                        <div className="min-w-0 flex-1">
+                          <span className="truncate font-medium">{folder?.name ?? "Unknown folder"}</span>
+                          {folder?.parentPath && (
+                            <span className="ml-2 text-[10px] text-muted-foreground/60">
+                              {folder.parentPath}
+                            </span>
+                          )}
+                        </div>
+                        <span className="shrink-0 text-[10px] text-muted-foreground/50 font-mono">
+                          {s.score} match{s.score !== 1 ? "es" : ""}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-2 py-4">
+                  <SearchIcon className="size-6 text-muted-foreground/40" />
+                  <p className="text-sm text-muted-foreground">No matching folders found</p>
+                  <p className="text-xs text-muted-foreground/50">Choose a destination manually below</p>
+                </div>
+              )}
+
+              <div className="flex flex-col gap-2">
+                <p className="text-xs text-muted-foreground uppercase tracking-[0.1em]">
+                  Or choose manually
+                </p>
+                <FolderCombobox
+                  folders={allFolders}
+                  value={selectedFolderId ?? ""}
+                  onChange={(id) => setSelectedFolderId(id)}
+                  placeholder="Search folders..."
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" size="sm" onClick={handleDialogClose}>
+                  Cancel
+                </Button>
+                <Button size="sm" onClick={handleUpload} disabled={!selectedFolderId || uploading}>
+                  {uploading ? "Uploading..." : "Upload"}
+                </Button>
+              </div>
+            </div>
           )}
         </DialogContent>
       </Dialog>
