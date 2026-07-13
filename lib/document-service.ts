@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/admin-client"
 type AdminClient = ReturnType<typeof createAdminClient>
 import { isFolderLocked, canBypassLock, hasFolderAction } from "@/lib/permission-utils"
 import { ACCEPTED_MIME_TYPES, MAX_FILE_SIZE, TEXT_EXTRACTABLE_TYPES } from "@/lib/constants"
+import { truncateFilename } from "@/lib/utils"
 
 interface CreateDocumentParams {
   adminClient: AdminClient
@@ -17,6 +18,7 @@ interface CreateDocumentParams {
 
 export async function createDocument(params: CreateDocumentParams) {
   const { adminClient, user, file, folderId, title, description, categoryId, documentTypeId, tagsStr } = params
+  const fileName = truncateFilename(file.name)
 
   if (!ACCEPTED_MIME_TYPES.includes(file.type)) {
     throw new ValidationError("Invalid file format")
@@ -47,7 +49,7 @@ export async function createDocument(params: CreateDocumentParams) {
     throw new ValidationError("You don't have permission to upload to this folder")
   }
 
-  const docTitle = title?.trim() || file.name.replace(/\.[^.]+$/, "")
+  const docTitle = title?.trim() || fileName.replace(/\.[^.]+$/, "")
   const tagNames = tagsStr
     ? tagsStr.split(",").map((t) => t.trim()).filter(Boolean)
     : []
@@ -64,7 +66,7 @@ export async function createDocument(params: CreateDocumentParams) {
       category_id: categoryId || null,
       document_type_id: documentTypeId || null,
       owner_id: user.id,
-      file_name: file.name,
+      file_name: fileName,
       file_size: file.size,
       file_type: file.type,
     })
@@ -75,7 +77,7 @@ export async function createDocument(params: CreateDocumentParams) {
     throw new Error("Failed to create document")
   }
 
-  const storagePath = `${doc.id}/v1-${file.name}`
+  const storagePath = `${doc.id}/v1-${fileName}`
 
   const { error: uploadError } = await adminClient.storage
     .from("documents")
@@ -150,7 +152,7 @@ export async function createDocument(params: CreateDocumentParams) {
     action: "upload",
     resource_type: "document",
     resource_id: doc.id,
-    details: { file_name: file.name, file_size: file.size },
+    details: { file_name: fileName, file_size: file.size },
   })
 
   const { data: usersWithView } = await adminClient

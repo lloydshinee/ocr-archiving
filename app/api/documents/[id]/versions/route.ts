@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/admin-client"
 import { requireAuth, withErrorHandling } from "@/lib/auth"
 import { isFolderLocked, canBypassLock, hasDocumentAction } from "@/lib/permission-utils"
+import { truncateFilename } from "@/lib/utils"
 
 const TEXT_EXTRACTABLE_TYPES = [
   "application/pdf",
@@ -72,6 +73,8 @@ export const POST = withErrorHandling(async (
         return NextResponse.json({ error: "File is required" }, { status: 400 })
       }
 
+      const fileName = truncateFilename(file.name)
+
       const { data: versions } = await adminClient
         .from("document_versions")
         .select("version_number")
@@ -81,7 +84,7 @@ export const POST = withErrorHandling(async (
         .single()
 
       const nextVersion = (versions?.version_number ?? 0) + 1
-      const storagePath = `${id}/v${nextVersion}-${file.name}`
+      const storagePath = `${id}/v${nextVersion}-${fileName}`
       const bytes = await file.arrayBuffer()
       const buffer = new Uint8Array(bytes)
 
@@ -115,7 +118,7 @@ export const POST = withErrorHandling(async (
           .from("documents")
           .update({
             current_version_id: version.id,
-            file_name: file.name,
+            file_name: fileName,
             file_size: file.size,
             file_type: file.type,
             updated_at: new Date().toISOString(),
@@ -135,7 +138,7 @@ export const POST = withErrorHandling(async (
           action: "version_update",
           resource_type: "document",
           resource_id: id,
-          details: { item: doc.title, new_version: nextVersion, file_name: file.name },
+          details: { item: doc.title, new_version: nextVersion, file_name: fileName },
         })
       }
 
