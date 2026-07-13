@@ -1,17 +1,14 @@
 "use client"
 
-import { useState, useRef, useEffect, useCallback } from "react"
+import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { UploadIcon, LightbulbIcon, SearchIcon, FolderIcon, CheckCircleIcon } from "lucide-react"
+import { UploadIcon, LightbulbIcon, SearchIcon, FolderIcon, ChevronRightIcon } from "lucide-react"
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog"
 import { FolderCombobox } from "@/components/folder-combobox"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
-import { OcrStatusBadge } from "@/components/ocr-status-badge"
-import { OcrViewerButton } from "@/components/ocr-viewer-button"
-import { TEXT_EXTRACTABLE_TYPES } from "@/lib/constants"
 import type { FolderSuggestion } from "@/lib/document-classifier"
 import { toast } from "sonner"
 
@@ -23,24 +20,31 @@ export function SmartDropZone() {
   const [analyzing, setAnalyzing] = useState(false)
   const [suggestions, setSuggestions] = useState<FolderSuggestion[]>([])
   const [timedOut, setTimedOut] = useState(false)
+  const [extractedText, setExtractedText] = useState<string | null>(null)
+  const [showExtractedText, setShowExtractedText] = useState(false)
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null)
   const [allFolders, setAllFolders] = useState<{ id: string; name: string; parentPath: string }[]>([])
   const [showDialog, setShowDialog] = useState(false)
   const [uploading, setUploading] = useState(false)
-  const [uploadedDoc, setUploadedDoc] = useState<{ id: string; title: string; fileType: string } | null>(null)
-  const [ocrStatus, setOcrStatus] = useState<string | null>(null)
-  const versionIdRef = useRef<string | null>(null)
 
   useEffect(() => {
     fetch("/api/folders")
       .then((r) => r.ok ? r.json() : null)
       .then((d) => {
         if (d?.folders) {
+          const folderMap = new Map(d.folders.map((f: { id: string }) => [f.id, f]))
+          function resolveParentPath(folderId: string | null): string {
+            if (!folderId) return ""
+            const parent = folderMap.get(folderId) as { name: string; parent_id: string | null } | undefined
+            if (!parent) return ""
+            const grandparent = resolveParentPath(parent.parent_id)
+            return grandparent ? `${grandparent} > ${parent.name}` : parent.name
+          }
           setAllFolders(
             d.folders.map((f: { id: string; name: string; parent_id?: string | null }) => ({
               id: f.id,
               name: f.name,
-              parentPath: "",
+              parentPath: resolveParentPath(f.parent_id ?? null),
             })),
           )
         }
@@ -56,6 +60,8 @@ export function SmartDropZone() {
     setDroppedFile(file)
     setSuggestions([])
     setTimedOut(false)
+    setExtractedText(null)
+    setShowExtractedText(false)
     setSelectedFolderId(null)
     setAnalyzing(true)
     setShowDialog(true)
@@ -69,6 +75,7 @@ export function SmartDropZone() {
         const s = (data?.suggestions as FolderSuggestion[]) ?? []
         setSuggestions(s)
         setTimedOut(data?.timed_out === true)
+        setExtractedText(data?.extracted_text ?? null)
         if (s.length > 0) {
           setSelectedFolderId(s[0].folderId)
         }
@@ -98,16 +105,9 @@ export function SmartDropZone() {
 
       if (res.ok) {
         toast.dismiss(toastId)
-        const data = await res.json()
-        const doc = data.documents?.[0]
-        if (doc?.id) {
-          setUploadedDoc({ id: doc.id, title: doc.title ?? droppedFile.name, fileType: droppedFile.type })
-          setOcrStatus(TEXT_EXTRACTABLE_TYPES.includes(droppedFile.type) ? "pending" : null)
-        } else {
-          setShowDialog(false)
-          setDroppedFile(null)
-          router.refresh()
-        }
+        toast.success("Uploaded successfully")
+        resetState()
+        router.refresh()
       } else {
         const data = await res.json()
         toast.error(data.error ?? "Upload failed", { id: toastId })
@@ -119,60 +119,19 @@ export function SmartDropZone() {
     }
   }
 
-  const docIdRef = useRef<string | null>(null)
-  const fileTypeRef = useRef<string | null>(null)
-
-  useEffect(() => {
-    if (!uploadedDoc) return
-    docIdRef.current = uploadedDoc.id
-    fileTypeRef.current = uploadedDoc.fileType
-  }, [uploadedDoc])
-
-  useEffect(() => {
-    if (!uploadedDoc || !TEXT_EXTRACTABLE_TYPES.includes(uploadedDoc.fileType)) return
-    const id = uploadedDoc.id
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/documents/${id}`)
-        if (!res.ok) return
-        const data = await res.json()
-        const version = data.versions?.[0]
-        if (!version?.ocr_status) return
-        versionIdRef.current = version.id
-        setOcrStatus(version.ocr_status)
-        if (version.ocr_status === "completed" || version.ocr_status === "failed") {
-          clearInterval(interval)
-        }
-      } catch {
-        // keep polling
-      }
-    }, 2000)
-    return () => clearInterval(interval)
-  }, [uploadedDoc])
-
   function resetState() {
     setShowDialog(false)
     setDroppedFile(null)
     setSuggestions([])
     setTimedOut(false)
+    setExtractedText(null)
+    setShowExtractedText(false)
     setSelectedFolderId(null)
-    setUploadedDoc(null)
-    setOcrStatus(null)
-    versionIdRef.current = null
   }
 
-  const handleFinish = useCallback(() => {
+  function handleDialogClose() {
     resetState()
     router.refresh()
-  }, [router])
-
-  function handleDialogClose() {
-    if (uploadedDoc) {
-      resetState()
-      router.refresh()
-    } else {
-      resetState()
-    }
   }
 
   return (
@@ -225,47 +184,14 @@ export function SmartDropZone() {
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>
-              {uploadedDoc
-                ? "Uploaded successfully"
-                : analyzing
-                  ? "Analyzing file..."
-                  : "Where should this go?"}
+              {analyzing ? "Analyzing file..." : "Where should this go?"}
             </DialogTitle>
             <DialogDescription>
-              {uploadedDoc?.title ?? droppedFile?.name}
+              {droppedFile?.name}
             </DialogDescription>
           </DialogHeader>
 
-          {uploadedDoc ? (
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center gap-3 rounded-lg border bg-muted/20 px-4 py-3">
-                <CheckCircleIcon className="size-5 shrink-0 text-green-500" />
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">{uploadedDoc.title}</p>
-                  <p className="text-[11px] text-muted-foreground/60">
-                    {droppedFile && (droppedFile.size / 1024).toFixed(1)} KB
-                  </p>
-                </div>
-              </div>
-
-              {TEXT_EXTRACTABLE_TYPES.includes(uploadedDoc.fileType) && (
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] text-muted-foreground/70">Text extraction:</span>
-                  {ocrStatus === "completed" ? (
-                    <OcrViewerButton documentId={uploadedDoc.id} title={uploadedDoc.title} status="completed" />
-                  ) : (
-                    <OcrStatusBadge status={ocrStatus ?? "pending"} versionId={versionIdRef.current || undefined} />
-                  )}
-                </div>
-              )}
-
-              <div className="flex justify-end gap-2 pt-2">
-                <Button size="sm" onClick={handleFinish}>
-                  Done
-                </Button>
-              </div>
-            </div>
-          ) : analyzing ? (
+          {analyzing ? (
             <div className="flex flex-col gap-4 py-6">
               <div className="flex items-center gap-3">
                 <Progress className="flex-1" />
@@ -321,6 +247,31 @@ export function SmartDropZone() {
                   <SearchIcon className="size-6 text-muted-foreground/40" />
                   <p className="text-sm text-muted-foreground">No matching folders found</p>
                   <p className="text-xs text-muted-foreground/50">Choose a destination manually below</p>
+                </div>
+              )}
+
+              {extractedText && (
+                <div className="flex flex-col gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setShowExtractedText(!showExtractedText)}
+                    className="flex items-center gap-2 text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+                  >
+                    <ChevronRightIcon
+                      className={`size-3 transition-transform ${showExtractedText ? "rotate-90" : ""}`}
+                    />
+                    {showExtractedText ? "Hide" : "Show"} extracted text
+                    <span className="font-mono text-[10px]">
+                      ({extractedText.length.toLocaleString()} chars)
+                    </span>
+                  </button>
+                  {showExtractedText && (
+                    <div className="max-h-36 overflow-auto rounded-lg border bg-muted/30 p-3">
+                      <pre className="whitespace-pre-wrap text-xs leading-relaxed font-sans text-muted-foreground/80">
+                        {extractedText}
+                      </pre>
+                    </div>
+                  )}
                 </div>
               )}
 
