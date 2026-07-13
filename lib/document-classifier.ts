@@ -127,11 +127,11 @@ export async function suggestFolder(
     .sort((a, b) => b.score - a.score)
     .slice(0, 3)
 
-  const results: FolderSuggestion[] = []
+  const suggestions: FolderSuggestion[] = []
   for (const s of scored) {
     const canCreate = await hasFolderAction(adminClient, userId, s.folderId, "create")
-    if (canCreate) results.push(s)
+    if (canCreate) suggestions.push(s)
   }
 
-  return results
+  return suggestions
 }

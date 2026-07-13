@@ -60,7 +60,7 @@ export function SmartDropZone() {
     fetch("/api/suggest-folder", { method: "POST", body: formData })
       .then((r) => r.ok ? r.json() : null)
       .then((data) => {
-        const s = (data?.suggestions as SuggestedFolder[]) ?? []
+        const s = (data?.suggestions as FolderSuggestion[]) ?? []
         setSuggestions(s)
         setTimedOut(data?.timed_out === true)
         if (s.length > 0) {
