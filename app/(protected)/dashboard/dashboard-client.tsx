@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import Link from "next/link"
+import { SmartDropZone } from "@/components/smart-drop-zone"
 
 interface DashboardData {
   role: string
@@ -132,6 +133,8 @@ export function DashboardPageClient() {
           </Link>
         </div>
       </div>
+
+      <SmartDropZone />
 
       {data?.recent_uploads && data.recent_uploads.length > 0 && (
         <Section title="Recent uploads" icon={ClockIcon}>
