@@ -27,8 +27,9 @@ export function SmartDropZone() {
   const [allFolders, setAllFolders] = useState<{ id: string; name: string; parentPath: string }[]>([])
   const [showDialog, setShowDialog] = useState(false)
   const [uploading, setUploading] = useState(false)
-  const [uploadedDoc, setUploadedDoc] = useState<{ id: string; title: string; fileType: string; versionId: string } | null>(null)
+  const [uploadedDoc, setUploadedDoc] = useState<{ id: string; title: string; fileType: string } | null>(null)
   const [ocrStatus, setOcrStatus] = useState<string | null>(null)
+  const versionIdRef = useRef<string | null>(null)
 
   useEffect(() => {
     fetch("/api/folders")
@@ -100,7 +101,7 @@ export function SmartDropZone() {
         const data = await res.json()
         const doc = data.documents?.[0]
         if (doc?.id) {
-          setUploadedDoc({ id: doc.id, title: doc.title ?? droppedFile.name, fileType: droppedFile.type, versionId: "" })
+          setUploadedDoc({ id: doc.id, title: doc.title ?? droppedFile.name, fileType: droppedFile.type })
           setOcrStatus(TEXT_EXTRACTABLE_TYPES.includes(droppedFile.type) ? "pending" : null)
         } else {
           setShowDialog(false)
@@ -118,17 +119,27 @@ export function SmartDropZone() {
     }
   }
 
+  const docIdRef = useRef<string | null>(null)
+  const fileTypeRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (!uploadedDoc) return
+    docIdRef.current = uploadedDoc.id
+    fileTypeRef.current = uploadedDoc.fileType
+  }, [uploadedDoc])
+
   useEffect(() => {
     if (!uploadedDoc || !TEXT_EXTRACTABLE_TYPES.includes(uploadedDoc.fileType)) return
+    const id = uploadedDoc.id
     const interval = setInterval(async () => {
       try {
-        const res = await fetch(`/api/documents/${uploadedDoc.id}`)
+        const res = await fetch(`/api/documents/${id}`)
         if (!res.ok) return
         const data = await res.json()
         const version = data.versions?.[0]
         if (!version?.ocr_status) return
+        versionIdRef.current = version.id
         setOcrStatus(version.ocr_status)
-        setUploadedDoc((prev) => prev ? { ...prev, versionId: version.id } : prev)
         if (version.ocr_status === "completed" || version.ocr_status === "failed") {
           clearInterval(interval)
         }
@@ -139,7 +150,7 @@ export function SmartDropZone() {
     return () => clearInterval(interval)
   }, [uploadedDoc])
 
-  const handleFinish = useCallback(() => {
+  function resetState() {
     setShowDialog(false)
     setDroppedFile(null)
     setSuggestions([])
@@ -147,25 +158,20 @@ export function SmartDropZone() {
     setSelectedFolderId(null)
     setUploadedDoc(null)
     setOcrStatus(null)
+    versionIdRef.current = null
+  }
+
+  const handleFinish = useCallback(() => {
+    resetState()
     router.refresh()
   }, [router])
 
   function handleDialogClose() {
     if (uploadedDoc) {
-      setShowDialog(false)
-      setDroppedFile(null)
-      setSuggestions([])
-      setTimedOut(false)
-      setSelectedFolderId(null)
-      setUploadedDoc(null)
-      setOcrStatus(null)
+      resetState()
       router.refresh()
     } else {
-      setShowDialog(false)
-      setDroppedFile(null)
-      setSuggestions([])
-      setTimedOut(false)
-      setSelectedFolderId(null)
+      resetState()
     }
   }
 
@@ -248,7 +254,7 @@ export function SmartDropZone() {
                   {ocrStatus === "completed" ? (
                     <OcrViewerButton documentId={uploadedDoc.id} title={uploadedDoc.title} status="completed" />
                   ) : (
-                    <OcrStatusBadge status={ocrStatus ?? "pending"} versionId={uploadedDoc.versionId || undefined} />
+                    <OcrStatusBadge status={ocrStatus ?? "pending"} versionId={versionIdRef.current || undefined} />
                   )}
                 </div>
               )}
