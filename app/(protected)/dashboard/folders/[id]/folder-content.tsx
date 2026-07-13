@@ -125,6 +125,13 @@ export function FolderContent({
   const [isDragOver, setIsDragOver] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [batchMoveOpen, setBatchMoveOpen] = useState(false)
+  const [moveDialog, setMoveDialog] = useState<{
+    type: "folder" | "document"
+    itemIds: string[]
+    currentParentId: string | null
+    itemName: string
+    canMoveToRoot: boolean
+  } | null>(null)
 
   const filteredSubfolders = useMemo(() => {
     let items = subfolders
@@ -592,20 +599,18 @@ export function FolderContent({
                         />
                         <DropdownMenuContent align="end" className="w-36">
                           {canMove && !isLocked && (
-                            <MoveDialog
-                              type="folder"
-                              itemIds={[sf.id]}
-                              currentParentId={folderId}
-                              itemName={sf.name}
-                              canMoveToRoot={userRole === "dean" || userRole === "program_head"}
-                              nativeButton={false}
-                              trigger={
-                                <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                                  <MoveIcon className="size-3.5" />
-                                  Move
-                                </DropdownMenuItem>
-                              }
-                            />
+                            <DropdownMenuItem
+                              onClick={() => setMoveDialog({
+                                type: "folder",
+                                itemIds: [sf.id],
+                                currentParentId: folderId,
+                                itemName: sf.name,
+                                canMoveToRoot: userRole === "dean" || userRole === "program_head",
+                              })}
+                            >
+                              <MoveIcon className="size-3.5" />
+                              Move
+                            </DropdownMenuItem>
                           )}
                           {canArchive && !isLocked && (
                             <DropdownMenuItem
@@ -749,19 +754,18 @@ export function FolderContent({
                             View
                           </DropdownMenuItem>
                           {canMove && !isLocked && (
-                            <MoveDialog
-                              type="document"
-                              itemIds={[doc.id]}
-                              currentParentId={folderId}
-                              itemName={doc.title}
-                              nativeButton={false}
-                              trigger={
-                                <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                                  <MoveIcon className="size-3.5" />
-                                  Move
-                                </DropdownMenuItem>
-                              }
-                            />
+                            <DropdownMenuItem
+                              onClick={() => setMoveDialog({
+                                type: "document",
+                                itemIds: [doc.id],
+                                currentParentId: folderId,
+                                itemName: doc.title,
+                                canMoveToRoot: false,
+                              })}
+                            >
+                              <MoveIcon className="size-3.5" />
+                              Move
+                            </DropdownMenuItem>
                           )}
                           {canArchive && !isLocked && (
                             <DropdownMenuItem
@@ -804,6 +808,17 @@ export function FolderContent({
         )}
       </div>
 
+      {moveDialog && (
+        <MoveDialog
+          type={moveDialog.type}
+          itemIds={moveDialog.itemIds}
+          currentParentId={moveDialog.currentParentId}
+          itemName={moveDialog.itemName}
+          canMoveToRoot={moveDialog.canMoveToRoot}
+          open={true}
+          onOpenChange={(v) => { if (!v) setMoveDialog(null) }}
+        />
+      )}
       {batchMoveOpen && (
         <MoveDialog
           type={subfolders.some((sf) => sel.selectedIds.has(sf.id)) ? "folder" : "document"}
