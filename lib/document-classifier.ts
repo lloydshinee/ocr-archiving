@@ -1,7 +1,4 @@
-import mammoth from "mammoth"
-import * as XLSX from "xlsx"
-import AdmZip from "adm-zip"
-import { PDFParse } from "pdf-parse"
+import { extractText as fullExtractText } from "@/lib/document-extractor"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/lib/supabase/database.types"
 import { filterSearchResults, type SearchResultItem } from "@/lib/search-utils"
@@ -12,72 +9,52 @@ export interface FolderSuggestion {
   score: number
 }
 
-const IMAGE_TYPES = new Set([
-  "image/jpeg", "image/png", "image/tiff", "image/bmp", "image/gif",
-])
+function tokenize(text: string): string[] {
+  return text.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 2)
+}
 
-async function extractFileText(buffer: Buffer, fileType: string): Promise<string | null> {
-  if (IMAGE_TYPES.has(fileType)) return null
-  if (fileType === "text/plain") return buffer.toString("utf-8").trim() || null
+async function getNameMatchScores(
+  text: string,
+  adminClient: SupabaseClient<Database>,
+): Promise<Map<string, { score: number; parentPath: string }>> {
+  const { data: folders } = await adminClient
+    .from("folders")
+    .select("id, name, parent_id")
+    .is("deleted_at", null)
+    .eq("is_archived", false)
 
-  if (fileType === "application/pdf") {
-    const doc = new PDFParse({ data: buffer })
-    const result = await doc.getText({ pageJoiner: "\n", lineEnforce: false })
-    await doc.destroy()
-    const t = result.text?.trim()
-    if (t && t.length > 20) return t
-    return null
+  if (!folders) return new Map()
+
+  const folderMap = new Map(folders.map((f) => [f.id, f]))
+
+  function resolveParentPath(folderId: string | null): string {
+    if (!folderId) return ""
+    const parent = folderMap.get(folderId)
+    if (!parent) return ""
+    const grandparent = resolveParentPath(parent.parent_id)
+    return grandparent ? `${grandparent} > ${parent.name}` : parent.name
   }
 
-  const DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-  const XLSX_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-  const PPTX = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+  const textTokens = new Set(tokenize(text))
+  const scores = new Map<string, { score: number; parentPath: string }>()
 
-  if (fileType === DOCX) {
-    const result = await mammoth.extractRawText({ buffer })
-    return result.value.trim() || null
-  }
+  for (const folder of folders) {
+    const parentPath = resolveParentPath(folder.parent_id)
+    const nameTokens = tokenize(folder.name)
+    const pathTokens = tokenize(parentPath)
+    const allTokens = [...new Set([...nameTokens, ...pathTokens])]
 
-  if (fileType === XLSX_TYPE) {
-    const workbook = XLSX.read(buffer, { type: "buffer" })
-    const texts: string[] = []
-    for (const sheetName of workbook.SheetNames) {
-      const sheet = workbook.Sheets[sheetName]
-      if (!sheet) continue
-      const rows = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1 }) as string[][]
-      for (const row of rows) {
-        for (const cell of row) {
-          if (cell != null && String(cell).trim()) texts.push(String(cell).trim())
-        }
-      }
+    if (allTokens.length === 0) continue
+
+    const matched = allTokens.filter((t) => textTokens.has(t)).length
+    const score = matched / allTokens.length
+
+    if (score > 0) {
+      scores.set(folder.id, { score, parentPath })
     }
-    return texts.join("\n") || null
   }
 
-  if (fileType === PPTX) {
-    const zip = new AdmZip(buffer)
-    const entries = zip.getEntries()
-    const slides = entries
-      .filter((e) => /^ppt\/slides\/slide\d+\.xml$/.test(e.entryName))
-      .sort((a, b) => {
-        const na = parseInt(a.entryName.match(/\d+/)?.[0] ?? "0")
-        const nb = parseInt(b.entryName.match(/\d+/)?.[0] ?? "0")
-        return na - nb
-      })
-    const texts: string[] = []
-    for (const entry of slides) {
-      const content = entry.getData().toString("utf-8")
-      const matches = content.match(/<a:t[^>]*>([^<]+)<\/a:t>/g)
-      if (!matches) continue
-      for (const m of matches) {
-        const inner = m.replace(/<[^>]+>/g, "")
-        if (inner.trim()) texts.push(inner.trim())
-      }
-    }
-    return texts.join("\n") || null
-  }
-
-  return null
+  return scores
 }
 
 export async function suggestFolder(
@@ -87,13 +64,15 @@ export async function suggestFolder(
   fileType: string,
   userId: string,
   skipExtraction = false,
-): Promise<FolderSuggestion[]> {
+): Promise<{ suggestions: FolderSuggestion[]; extractedText: string | null }> {
   let query = fileName.replace(/\.[^.]+$/, "")
+  let extractedText: string | null = null
 
   if (!skipExtraction) {
     try {
-      const text = await extractFileText(buffer, fileType)
+      const text = await fullExtractText(buffer, fileType)
       if (text) {
+        extractedText = text
         const words = text.trim().split(/\s+/).filter((w) => /[a-zA-Z]{3,}/.test(w))
         if (words.length >= 3) {
           query = query + " " + text.trim().slice(0, 500)
@@ -104,34 +83,48 @@ export async function suggestFolder(
     }
   }
 
-  const { data: results } = await adminClient.rpc("search_archives", {
+  const nameScores = extractedText
+    ? await getNameMatchScores(extractedText, adminClient)
+    : new Map<string, { score: number; parentPath: string }>()
+
+  const { data: results } = (await adminClient.rpc("search_archives", {
     p_query: query,
     p_include_archived: false,
     p_limit: 100,
     p_offset: 0,
-  }) as { data: SearchResultItem[] | null }
+  })) as { data: SearchResultItem[] | null }
 
-  if (!results || results.length === 0) return []
+  const permitted = results ? await filterSearchResults(adminClient, results, userId) : []
 
-  const permitted = await filterSearchResults(adminClient, results, userId)
-  if (permitted.length === 0) return []
-
-  const folderCounts = new Map<string, number>()
+  const searchCounts = new Map<string, number>()
   for (const r of permitted) {
     if (!r.folder_id) continue
-    folderCounts.set(r.folder_id, (folderCounts.get(r.folder_id) ?? 0) + 1)
+    searchCounts.set(r.folder_id, (searchCounts.get(r.folder_id) ?? 0) + 1)
   }
 
-  const scored = Array.from(folderCounts.entries())
-    .map(([folderId, count]) => ({ folderId, score: count }))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 3)
+  const allFolderIds = new Set([...nameScores.keys(), ...searchCounts.keys()])
+  const maxSearch = Math.max(...searchCounts.values(), 1)
+  const combined: { folderId: string; score: number }[] = []
+
+  for (const folderId of allFolderIds) {
+    const nameScore = nameScores.get(folderId)?.score ?? 0
+    const searchScore = searchCounts.get(folderId) ?? 0
+    const total = nameScore * 3 + searchScore / maxSearch
+    if (total > 0) {
+      combined.push({ folderId, score: total })
+    }
+  }
+
+  combined.sort((a, b) => b.score - a.score)
 
   const suggestions: FolderSuggestion[] = []
-  for (const s of scored) {
+  for (const s of combined.slice(0, 10)) {
     const canCreate = await hasFolderAction(adminClient, userId, s.folderId, "create")
-    if (canCreate) suggestions.push(s)
+    if (canCreate) {
+      suggestions.push({ folderId: s.folderId, score: Math.round(s.score * 100) / 100 })
+      if (suggestions.length >= 3) break
+    }
   }
 
-  return suggestions
+  return { suggestions, extractedText }
 }

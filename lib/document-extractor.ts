@@ -1,3 +1,4 @@
+import path from "path"
 import mammoth from "mammoth"
 import * as XLSX from "xlsx"
 import AdmZip from "adm-zip"
@@ -14,6 +15,7 @@ const OCR_IMAGE_TYPES = new Set([
 
 async function runOcr(buffer: Buffer): Promise<string> {
   const { data } = await Tesseract.recognize(buffer, "eng", {
+    workerPath: path.join(process.cwd(), "node_modules/tesseract.js/src/worker-script/node/index.js"),
     logger: () => {},
   })
   return data.text.trim()
